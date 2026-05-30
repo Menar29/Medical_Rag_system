@@ -15,7 +15,11 @@ function SettingsPage() {
   const model = useAppStore((s) => s.model);
   const setModel = useAppStore((s) => s.setModel);
 
-  const [voice, setVoice] = useState(true);
+  const voiceEnabled = useAppStore((s) => s.voiceEnabled);
+  const setVoiceEnabled = useAppStore((s) => s.setVoiceEnabled);
+  const autoPlay = useAppStore((s) => s.autoPlay);
+  const setAutoPlay = useAppStore((s) => s.setAutoPlay);
+
   const [autoLang, setAutoLang] = useState(true);
   const [translate, setTranslate] = useState(false);
 
@@ -86,7 +90,8 @@ function SettingsPage() {
         </Section>
 
         <Section title="Audio" desc="Synthèse vocale et reconnaissance.">
-          <Toggle label="Lecture automatique des réponses" checked={voice} onChange={setVoice} />
+          <Toggle label="Activer la synthèse vocale" checked={voiceEnabled} onChange={setVoiceEnabled} />
+          <Toggle label="Lecture automatique des réponses" checked={autoPlay} onChange={setAutoPlay} />
         </Section>
 
         <Section title="Traduction" desc="Détection et traduction automatiques.">

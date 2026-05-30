@@ -49,6 +49,12 @@ type State = {
   model: ModelId;
   setModel: (m: ModelId) => void;
 
+  autoPlay: boolean;
+  setAutoPlay: (v: boolean) => void;
+
+  voiceEnabled: boolean;
+  setVoiceEnabled: (v: boolean) => void;
+
   conversations: Conversation[];
   activeId: string | null;
   setActive: (id: string) => void;
@@ -69,6 +75,12 @@ export const useAppStore = create<State>()(
 
       model: "gemma-3-multimodal",
       setModel: (m) => set({ model: m }),
+
+      autoPlay: false,
+      setAutoPlay: (v) => set({ autoPlay: v }),
+
+      voiceEnabled: true,
+      setVoiceEnabled: (v) => set({ voiceEnabled: v }),
 
       conversations: [],
       activeId: null,
@@ -132,6 +144,8 @@ export const useAppStore = create<State>()(
       partialize: (s) => ({
         language: s.language,
         model: s.model,
+        autoPlay: s.autoPlay,
+        voiceEnabled: s.voiceEnabled,
         conversations: s.conversations,
         activeId: s.activeId,
       }),

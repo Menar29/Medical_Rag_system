@@ -5,11 +5,14 @@ import {
   FileText,
   Image as ImageIcon,
   Mic,
+  MicOff,
   Paperclip,
   Square,
   X,
 } from "lucide-react";
 import { useT } from "@/hooks/useT";
+import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
+import { useAppStore } from "@/store/useAppStore";
 import { toast } from "sonner";
 import type { Attachment } from "@/store/useAppStore";
 import { ModelSelector } from "./ModelSelector";
@@ -23,18 +26,18 @@ const uid = () => Math.random().toString(36).slice(2, 10);
 
 export function ChatInput({ onSubmit, disabled }: Props) {
   const t = useT();
+  const language = useAppStore((s) => s.language);
   const [text, setText] = useState("");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
-  const [recording, setRecording] = useState(false);
-  const [recTime, setRecTime] = useState(0);
   const [isDrag, setIsDrag] = useState(false);
   const taRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const imgRef = useRef<HTMLInputElement>(null);
-  const mediaRef = useRef<MediaRecorder | null>(null);
-  const recTimerRef = useRef<number | null>(null);
 
-  // Auto-resize
+  const { listening, interimText, supported: sttSupported, start, stop } =
+    useSpeechRecognition(language);
+
+  // Auto-resize textarea
   useEffect(() => {
     const ta = taRef.current;
     if (!ta) return;
@@ -70,53 +73,25 @@ export function ChatInput({ onSubmit, disabled }: Props) {
     }
   };
 
-  const startRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mr = new MediaRecorder(stream);
-      const chunks: BlobPart[] = [];
-      mr.ondataavailable = (e) => chunks.push(e.data);
-      mr.onstop = () => {
-        const blob = new Blob(chunks, { type: "audio/webm" });
-        const att: Attachment = {
-          id: uid(),
-          type: "audio",
-          name: `voice-${Date.now()}.webm`,
-          url: URL.createObjectURL(blob),
-          size: blob.size,
-        };
-        setAttachments((a) => [...a, att]);
-        stream.getTracks().forEach((tr) => tr.stop());
-      };
-      mr.start();
-      mediaRef.current = mr;
-      setRecording(true);
-      setRecTime(0);
-      recTimerRef.current = window.setInterval(() => setRecTime((s) => s + 1), 1000);
-    } catch {
-      toast.error("Micro inaccessible");
+  const toggleVoice = () => {
+    if (listening) {
+      stop();
+      return;
     }
-  };
-
-  const stopRecording = () => {
-    mediaRef.current?.stop();
-    mediaRef.current = null;
-    if (recTimerRef.current) {
-      clearInterval(recTimerRef.current);
-      recTimerRef.current = null;
+    if (!sttSupported) {
+      toast.error(t("stt_not_supported"));
+      return;
     }
-    setRecording(false);
+    start((final) => {
+      setText((prev) => (prev ? prev + " " + final : final));
+    });
   };
 
   return (
     <div className="px-3 sm:px-6 pb-4 sm:pb-6 pt-2">
       <div className="max-w-3xl mx-auto">
-        {/* Drop zone wrapper */}
         <div
-          onDragOver={(e) => {
-            e.preventDefault();
-            setIsDrag(true);
-          }}
+          onDragOver={(e) => { e.preventDefault(); setIsDrag(true); }}
           onDragLeave={() => setIsDrag(false)}
           onDrop={(e) => {
             e.preventDefault();
@@ -157,9 +132,14 @@ export function ChatInput({ onSubmit, disabled }: Props) {
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={onKeyDown}
-            placeholder={recording ? t("listening") : t("ask_placeholder")}
+            placeholder={
+              listening
+                ? interimText || t("listening")
+                : t("ask_placeholder")
+            }
             rows={1}
-            disabled={disabled || recording}
+            readOnly={listening}
+            disabled={disabled}
             className="w-full resize-none bg-transparent px-4 pt-4 pb-2 outline-none placeholder:text-muted-foreground/70 text-[15px] leading-relaxed"
           />
 
@@ -181,22 +161,31 @@ export function ChatInput({ onSubmit, disabled }: Props) {
                 <ImageIcon className="h-4 w-4" />
               </IconBtn>
 
-              {/* Voice */}
-              {recording ? (
+              {/* Voice / STT button */}
+              {listening ? (
                 <button
-                  onClick={stopRecording}
-                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-destructive/15 text-destructive border border-destructive/30 text-xs"
+                  onClick={toggleVoice}
+                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-medical/15 text-medical border border-medical/30 text-xs"
                 >
                   <span className="relative flex h-2 w-2">
-                    <span className="absolute inline-flex h-full w-full rounded-full bg-destructive opacity-60 animate-ping" />
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-destructive" />
+                    <span className="absolute inline-flex h-full w-full rounded-full bg-medical opacity-60 animate-ping" />
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-medical" />
                   </span>
-                  {formatTime(recTime)}
+                  {t("listening")}
                   <Square className="h-3 w-3 fill-current" />
                 </button>
               ) : (
-                <IconBtn title={t("record")} onClick={startRecording} disabled={disabled}>
-                  <Mic className="h-4 w-4" />
+                <IconBtn
+                  title={sttSupported ? t("record") : t("stt_not_supported")}
+                  onClick={toggleVoice}
+                  disabled={disabled}
+                  active={false}
+                >
+                  {sttSupported ? (
+                    <Mic className="h-4 w-4" />
+                  ) : (
+                    <MicOff className="h-4 w-4 opacity-40" />
+                  )}
                 </IconBtn>
               )}
 
@@ -247,18 +236,24 @@ function IconBtn({
   title,
   onClick,
   disabled,
+  active,
 }: {
   children: React.ReactNode;
   title: string;
   onClick: () => void;
   disabled?: boolean;
+  active?: boolean;
 }) {
   return (
     <button
       title={title}
       onClick={onClick}
       disabled={disabled}
-      className="h-9 w-9 rounded-lg grid place-items-center text-muted-foreground hover:text-foreground hover:bg-white/[0.05] transition disabled:opacity-40"
+      className={`h-9 w-9 rounded-lg grid place-items-center transition disabled:opacity-40 ${
+        active
+          ? "text-medical bg-medical/10"
+          : "text-muted-foreground hover:text-foreground hover:bg-white/[0.05]"
+      }`}
     >
       {children}
     </button>
@@ -287,11 +282,7 @@ function AttachmentChip({
         />
       ) : (
         <div className="flex items-center gap-2 h-16 px-3 rounded-lg border border-border/60 bg-white/[0.03] text-xs max-w-[220px]">
-          {att.type === "pdf" ? (
-            <FileText className="h-4 w-4 text-medical-glow shrink-0" />
-          ) : (
-            <Mic className="h-4 w-4 text-medical-glow shrink-0" />
-          )}
+          <FileText className="h-4 w-4 text-medical-glow shrink-0" />
           <span className="truncate">{att.name}</span>
         </div>
       )}
@@ -304,10 +295,4 @@ function AttachmentChip({
       </button>
     </motion.div>
   );
-}
-
-function formatTime(s: number) {
-  const m = Math.floor(s / 60);
-  const r = s % 60;
-  return `${m}:${r.toString().padStart(2, "0")}`;
 }

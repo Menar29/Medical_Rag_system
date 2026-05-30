@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -7,12 +8,14 @@ import {
   Sparkles,
   User,
   Volume2,
+  VolumeX,
   Copy,
   Check,
 } from "lucide-react";
 import type { Message } from "@/store/useAppStore";
+import { useAppStore } from "@/store/useAppStore";
+import { useSpeechSynthesis } from "@/hooks/useSpeechSynthesis";
 import { TypingLoader } from "./TypingLoader";
-import { useState } from "react";
 import { toast } from "sonner";
 
 export function MessageBubble({ message }: { message: Message }) {
@@ -61,8 +64,8 @@ export function MessageBubble({ message }: { message: Message }) {
           !isUser && <TypingLoader />
         )}
 
-        {/* Sources & meta (assistant only, when done) */}
-        {!isUser && !message.streaming && message.sources && message.sources.length > 0 && (
+        {/* Actions + Sources (assistant only, when done) */}
+        {!isUser && !message.streaming && (
           <Footer message={message} />
         )}
       </div>
@@ -115,6 +118,22 @@ function Footer({ message }: { message: Message }) {
   const [copied, setCopied] = useState(false);
   const confidence = Math.round((message.confidence ?? 0) * 100);
 
+  const language = useAppStore((s) => s.language);
+  const autoPlay = useAppStore((s) => s.autoPlay);
+  const voiceEnabled = useAppStore((s) => s.voiceEnabled);
+
+  const { speaking, supported: ttsSupported, speak, stop } = useSpeechSynthesis();
+
+  // Auto-play when the message finishes streaming
+  useEffect(() => {
+    if (autoPlay && voiceEnabled && message.content) {
+      const lang = message.detectedLang ?? language;
+      speak(message.content, lang);
+    }
+    // Only trigger once when component mounts (message just became non-streaming)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const copy = async () => {
     await navigator.clipboard.writeText(message.content);
     setCopied(true);
@@ -122,30 +141,34 @@ function Footer({ message }: { message: Message }) {
     setTimeout(() => setCopied(false), 1500);
   };
 
-  const speak = () => {
-    if (!("speechSynthesis" in window)) {
+  const toggleSpeak = () => {
+    if (!ttsSupported) {
       toast.error("Synthèse vocale non supportée");
       return;
     }
-    window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(message.content.replace(/[#*`>]/g, ""));
-    u.lang = message.detectedLang === "en" ? "en-US" : "fr-FR";
-    window.speechSynthesis.speak(u);
+    if (speaking) {
+      stop();
+    } else {
+      const lang = message.detectedLang ?? language;
+      speak(message.content, lang);
+    }
   };
 
   return (
     <div className="mt-3 space-y-3">
       <div className="flex flex-wrap items-center gap-2">
-        <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-          <span>Confiance</span>
-          <div className="h-1.5 w-20 rounded-full bg-white/[0.06] overflow-hidden">
-            <div
-              className="h-full bg-gradient-to-r from-medical to-violet-soft"
-              style={{ width: `${confidence}%` }}
-            />
+        {confidence > 0 && (
+          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+            <span>Confiance</span>
+            <div className="h-1.5 w-20 rounded-full bg-white/[0.06] overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-medical to-violet-soft"
+                style={{ width: `${confidence}%` }}
+              />
+            </div>
+            <span className="text-foreground/80 font-medium">{confidence}%</span>
           </div>
-          <span className="text-foreground/80 font-medium">{confidence}%</span>
-        </div>
+        )}
         <div className="flex-1" />
         <button
           onClick={copy}
@@ -154,34 +177,46 @@ function Footer({ message }: { message: Message }) {
         >
           {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
         </button>
-        <button
-          onClick={speak}
-          className="p-1.5 rounded-md hover:bg-white/[0.05] text-muted-foreground hover:text-foreground transition"
-          aria-label="lire"
-        >
-          <Volume2 className="h-3.5 w-3.5" />
-        </button>
+        {voiceEnabled && (
+          <button
+            onClick={toggleSpeak}
+            className={`p-1.5 rounded-md transition ${
+              speaking
+                ? "text-medical bg-medical/10 hover:bg-medical/20"
+                : "text-muted-foreground hover:text-foreground hover:bg-white/[0.05]"
+            }`}
+            aria-label={speaking ? "arrêter la lecture" : "lire à voix haute"}
+          >
+            {speaking ? (
+              <VolumeX className="h-3.5 w-3.5" />
+            ) : (
+              <Volume2 className="h-3.5 w-3.5" />
+            )}
+          </button>
+        )}
       </div>
 
-      <div>
-        <div className="text-[11px] uppercase tracking-wider text-muted-foreground/80 mb-1.5">
-          Sources
+      {message.sources && message.sources.length > 0 && (
+        <div>
+          <div className="text-[11px] uppercase tracking-wider text-muted-foreground/80 mb-1.5">
+            Sources
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {message.sources.map((s, i) => (
+              <div
+                key={s.id}
+                className="group flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border border-border/60 bg-white/[0.025] hover:bg-white/[0.05] hover:border-medical/40 transition cursor-pointer"
+                title={s.snippet}
+              >
+                <span className="text-[10px] font-mono text-medical-glow">[{i + 1}]</span>
+                <FileText className="h-3 w-3 text-muted-foreground" />
+                <span className="truncate max-w-[280px]">{s.title}</span>
+                {s.page && <span className="text-muted-foreground">· p.{s.page}</span>}
+              </div>
+            ))}
+          </div>
         </div>
-        <div className="flex flex-wrap gap-1.5">
-          {message.sources?.map((s, i) => (
-            <div
-              key={s.id}
-              className="group flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border border-border/60 bg-white/[0.025] hover:bg-white/[0.05] hover:border-medical/40 transition cursor-pointer"
-              title={s.snippet}
-            >
-              <span className="text-[10px] font-mono text-medical-glow">[{i + 1}]</span>
-              <FileText className="h-3 w-3 text-muted-foreground" />
-              <span className="truncate max-w-[280px]">{s.title}</span>
-              {s.page && <span className="text-muted-foreground">· p.{s.page}</span>}
-            </div>
-          ))}
-        </div>
-      </div>
+      )}
     </div>
   );
 }
