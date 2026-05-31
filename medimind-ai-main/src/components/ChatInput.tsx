@@ -15,7 +15,6 @@ import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
 import { useAppStore } from "@/store/useAppStore";
 import { toast } from "sonner";
 import type { Attachment } from "@/store/useAppStore";
-import { ModelSelector } from "./ModelSelector";
 
 type Props = {
   onSubmit: (text: string, attachments: Attachment[]) => void;
@@ -27,6 +26,7 @@ const uid = () => Math.random().toString(36).slice(2, 10);
 export function ChatInput({ onSubmit, disabled }: Props) {
   const t = useT();
   const language = useAppStore((s) => s.language);
+  const userRole = useAppStore((s) => s.userRole);
   const [text, setText] = useState("");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [isDrag, setIsDrag] = useState(false);
@@ -135,7 +135,9 @@ export function ChatInput({ onSubmit, disabled }: Props) {
             placeholder={
               listening
                 ? interimText || t("listening")
-                : t("ask_placeholder")
+                : userRole === "professional"
+                  ? t("ask_placeholder_pro")
+                  : t("ask_placeholder")
             }
             rows={1}
             readOnly={listening}
@@ -189,9 +191,6 @@ export function ChatInput({ onSubmit, disabled }: Props) {
                 </IconBtn>
               )}
 
-              <div className="ml-1 hidden sm:block">
-                <ModelSelector />
-              </div>
             </div>
 
             <motion.button
@@ -206,8 +205,8 @@ export function ChatInput({ onSubmit, disabled }: Props) {
           </div>
         </div>
 
-        <p className="mt-2 text-center text-[11px] text-muted-foreground/70">
-          MediRAG peut commettre des erreurs. Validez toujours avec un professionnel de santé.
+        <p className="mt-2 text-center text-[11px] text-muted-foreground/60">
+          {t("disclaimer")}
         </p>
 
         <input

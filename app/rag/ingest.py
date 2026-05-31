@@ -183,6 +183,22 @@ class PDFIngestionService:
 
         return pdf_files
 
+    def get_ingestion_stats(self) -> Dict[str, Any]:
+        try:
+            all_docs = self.vector_store.db.get()
+            filenames = {
+                meta.get("filename")
+                for meta in (all_docs.get("metadatas") or [])
+                if meta and meta.get("filename")
+            }
+            return {
+                "total_chunks": len(all_docs.get("ids") or []),
+                "total_documents": len(filenames),
+                "document_names": sorted(filenames),
+            }
+        except Exception as e:
+            return {"error": str(e), "total_chunks": 0, "total_documents": 0}
+
     def delete_by_source(self, source_path: str) -> Dict[str, Any]:
 
         try:

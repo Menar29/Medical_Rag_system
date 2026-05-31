@@ -5,7 +5,7 @@ This package provides a complete RAG system with:
 - PDF document ingestion
 - Vector-based document retrieval
 - LLM-powered response generation
-- Multi-language support (French, Hausa, Zarma)
+- Multi-language support (French, Hausa)
 - Translation services
 - FastAPI REST API
 """

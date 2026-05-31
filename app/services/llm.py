@@ -4,10 +4,10 @@ import requests
 import json
 
 
-class MistralLLM:
-    """Service for connecting to local Ollama Mistral 7B model."""
+class OllamaLLM:
+    """Service for connecting to local Ollama Gemma 4 model."""
     
-    def __init__(self, model: str = "mistral", base_url: str = "http://localhost:11434"):
+    def __init__(self, model: str = "gemma4", base_url: str = "http://localhost:11434"):
         self.model = model
         self.base_url = base_url
     
@@ -18,7 +18,7 @@ class MistralLLM:
         temperature: float = 0.7,
         max_tokens: int = 1000
     ) -> str:
-        """Generate a response using local Mistral 7B via Ollama."""
+        """Generate a response using local Gemma 4 via Ollama."""
         
         # Build context-aware prompt
         if context:
@@ -61,7 +61,7 @@ Réponse:"""
         temperature: float = 0.7,
         max_tokens: int = 1000
     ):
-        """Generate a streaming response using local Mistral 7B via Ollama."""
+        """Generate a streaming response using local Gemma 4 via Ollama."""
         
         if context:
             context_str = "\n".join([f"- {doc}" for doc in context])

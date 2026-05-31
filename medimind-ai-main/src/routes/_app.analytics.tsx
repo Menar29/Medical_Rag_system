@@ -40,10 +40,9 @@ const latency = [
   { day: "Dim", ms: 710 },
 ];
 const langs = [
-  { name: "Français", value: 52, color: "oklch(0.72 0.16 230)" },
+  { name: "Français", value: 58, color: "oklch(0.72 0.16 230)" },
   { name: "Anglais", value: 28, color: "oklch(0.68 0.18 295)" },
   { name: "Hausa", value: 14, color: "oklch(0.78 0.15 180)" },
-  { name: "Zarma", value: 6, color: "oklch(0.75 0.18 60)" },
 ];
 
 function AnalyticsPage() {

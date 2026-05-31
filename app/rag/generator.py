@@ -1,13 +1,13 @@
 from typing import List, Optional, Dict, Any
 from langchain_core.documents import Document
-from ..services.llm import MistralLLM
+from ..services.llm import OllamaLLM
 
 
 class RAGGenerator:
     """Service for generating responses using LLM with retrieved context."""
 
-    def __init__(self, llm_service: Optional[MistralLLM] = None):
-        self.llm_service = llm_service or MistralLLM()
+    def __init__(self, llm_service: Optional[OllamaLLM] = None):
+        self.llm_service = llm_service or OllamaLLM()
 
     def generate_response(
         self,
@@ -15,11 +15,12 @@ class RAGGenerator:
         retrieved_docs: List[Document],
         language: str = "fr",
         temperature: float = 0.3,
-        max_tokens: int = 800
+        max_tokens: int = 800,
+        history: Optional[List[Dict[str, str]]] = None,
+        patient_context: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Generate a response based on query and retrieved documents."""
 
-        # 🚨 Cas critique : aucun document trouvé
         if not retrieved_docs:
             return {
                 "response": "Je ne trouve pas cette information dans les documents fournis.",
@@ -28,11 +29,8 @@ class RAGGenerator:
                 "context_used": False
             }
 
-        # Format context
         context = self._format_context(retrieved_docs)
-
-        # Build strict prompt
-        prompt = self._build_prompt(query, context, language)
+        prompt = self._build_prompt(query, context, language, history or [], patient_context)
 
         try:
             response = self.llm_service.generate_response(
@@ -63,7 +61,9 @@ class RAGGenerator:
         retrieved_docs: List[Document],
         language: str = "fr",
         temperature: float = 0.3,
-        max_tokens: int = 800
+        max_tokens: int = 800,
+        history: Optional[List[Dict[str, str]]] = None,
+        patient_context: Optional[Dict[str, Any]] = None,
     ):
         """Generate a streaming response."""
 
@@ -77,7 +77,7 @@ class RAGGenerator:
             return
 
         context = self._format_context(retrieved_docs)
-        prompt = self._build_prompt(query, context, language)
+        prompt = self._build_prompt(query, context, language, history or [], patient_context)
 
         try:
             for chunk in self.llm_service.generate_streaming_response(
@@ -123,36 +123,49 @@ class RAGGenerator:
             for i, doc in enumerate(documents)
         ]
 
-    def _build_prompt(self, query: str, context: str, language: str) -> str:
-        """Strict anti-hallucination prompt."""
+    def _build_prompt(
+        self,
+        query: str,
+        context: str,
+        language: str,
+        history: Optional[List[Dict[str, str]]] = None,
+        patient_context: Optional[Dict[str, Any]] = None,
+    ) -> str:
+        """Strict anti-hallucination prompt with conversation history and patient context."""
 
-        return f"""
-Tu es un assistant médical spécialisé dans le cancer du col de l'utérus.
+        history_block = ""
+        if history:
+            turns = []
+            for msg in history[-6:]:  # keep last 3 exchanges
+                role = "Utilisateur" if msg.get("role") == "user" else "Assistant"
+                turns.append(f"{role} : {msg.get('content', '')}")
+            history_block = "\n\nHISTORIQUE DE LA CONVERSATION :\n" + "\n".join(turns)
 
-Tu dois STRICTEMENT répondre en utilisant uniquement les informations présentes dans le contexte.
+        patient_block = ""
+        if patient_context:
+            lines = [f"- {k}: {v}" for k, v in patient_context.items()]
+            patient_block = "\n\nCONTEXTE PATIENTE :\n" + "\n".join(lines)
+
+        return f"""Tu es CerviScan AI, un assistant médical spécialisé dans le cancer du col de l'utérus.
+Tu travailles avec une base documentaire médicale validée (OMS, protocoles nationaux Niger).
+{patient_block}{history_block}
 
 =====================
-CONTEXTE :
+DOCUMENTS MÉDICAUX PERTINENTS :
 {context}
 =====================
 
-QUESTION :
-{query}
+QUESTION ACTUELLE : {query}
 
-=====================
 RÈGLES OBLIGATOIRES :
-1. Utilise UNIQUEMENT les informations du contexte
-2. Si l'information n'existe pas, réponds EXACTEMENT :
-   "Je ne trouve pas cette information dans les documents fournis."
-3. Ne JAMAIS inventer ou compléter avec tes connaissances
-4. Si possible, cite EXACTEMENT une phrase du contexte
-5. Indique la source utilisée (ex: SOURCE 1)
-6. Réponds en {language}
-7. Sois clair, précis et professionnel
-=====================
+1. Utilise UNIQUEMENT les informations des documents ci-dessus
+2. Si l'information est absente, réponds : "Je ne trouve pas cette information dans les documents fournis."
+3. Ne jamais inventer, ni compléter avec des connaissances externes
+4. Cite la source utilisée (ex: SOURCE 1)
+5. Réponds en langue : {language}
+6. Sois clair, précis, bienveillant envers les patientes et rigoureux avec les professionnels
 
-RÉPONSE :
-"""
+RÉPONSE :"""
 
     def generate_summary(self, documents: List[Document], language: str = "fr") -> str:
         """Generate a summary of documents."""

@@ -62,16 +62,16 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "MediRAG — Assistant IA médical multilingue" },
+      { title: "CerviScan AI — Assistant médical intelligent" },
       {
         name: "description",
         content:
-          "MediRAG : assistant IA médical multimodal et multilingue (français, anglais, hausa, zarma) basé sur un système RAG.",
+          "MediRAG : assistant IA médical multimodal et multilingue (français, anglais, hausa) basé sur un système RAG.",
       },
-      { property: "og:title", content: "MediRAG — Assistant IA médical" },
+      { property: "og:title", content: "CerviScan AI — Assistant médical" },
       {
         property: "og:description",
-        content: "Assistant IA médical multilingue basé sur RAG.",
+        content: "Assistant médical intelligent pour le dépistage du cancer du col de l'utérus.",
       },
       { property: "og:type", content: "website" },
     ],

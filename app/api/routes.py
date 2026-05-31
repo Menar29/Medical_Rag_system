@@ -1,19 +1,49 @@
-from fastapi import APIRouter, HTTPException, UploadFile, File
+import asyncio
+import json
+import os
+import time
+import hashlib
+import uuid
+from typing import AsyncGenerator, List, Optional, Dict, Any
+
+import pypdf
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from typing import List, Optional, Dict, Any
+from .auth import require_api_key
 
 router = APIRouter()
+
+UPLOAD_DIR = "uploads"
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+
+# ── Pydantic models ────────────────────────────────────────────────────────────
+
+class HistoryMessage(BaseModel):
+    role: str   # "user" | "assistant"
+    content: str
 
 
 class QueryRequest(BaseModel):
     query: str
     language: Optional[str] = None
+    history: Optional[List[HistoryMessage]] = []
+    patient_context: Optional[Dict[str, Any]] = None
+
+
+class RetrievedDoc(BaseModel):
+    content: str
+    metadata: Dict[str, Any] = {}
 
 
 class QueryResponse(BaseModel):
     answer: str
     language: str
     confidence: float
+    retrieved_count: int = 0
+    retrieved_docs: List[RetrievedDoc] = []
+    query: str = ""
 
 
 class DocumentResponse(BaseModel):
@@ -25,116 +55,290 @@ class DocumentResponse(BaseModel):
     status: str
 
 
+# ── Helper ─────────────────────────────────────────────────────────────────────
+
+def _get_pipeline():
+    from ..main import pipeline
+    if pipeline is None:
+        raise HTTPException(status_code=503, detail="RAG Pipeline not initialized")
+    return pipeline
+
+
+def _count_pdf_pages(path: str) -> int:
+    try:
+        with open(path, "rb") as f:
+            return len(pypdf.PdfReader(f).pages)
+    except Exception:
+        return 1
+
+
+# ── Endpoints ──────────────────────────────────────────────────────────────────
+
 @router.get("/health")
 async def health_check():
-    """Health check endpoint for the API."""
-    return {
-        "status": "healthy",
-        "message": "RAG API is operational"
-    }
+    return {"status": "healthy", "message": "RAG API is operational"}
 
 
-@router.post("/query", response_model=QueryResponse)
+@router.post("/query", response_model=QueryResponse, dependencies=[Depends(require_api_key)])
 async def query_rag(request: QueryRequest):
-    """Query the RAG pipeline with a question."""
+    pipeline = _get_pipeline()
     try:
-        # Import pipeline here to avoid circular imports
-        from ..main import pipeline
-        
-        if pipeline is None:
-            raise HTTPException(status_code=503, detail="RAG Pipeline not initialized")
-        
-        # Use the actual RAG pipeline
-        result = pipeline.ask(query=request.query, k=4)
-        
+        result = pipeline.ask(
+            query=request.query,
+            k=4,
+            language=request.language or "auto",
+            history=[h.model_dump() for h in (request.history or [])],
+            patient_context=request.patient_context,
+        )
+
         if "error" in result:
             raise HTTPException(status_code=500, detail=result["error"])
-        
-        return {
-            "answer": result.get("response", "No response generated"),
-            "language": result.get("detected_language", request.language or "unknown"),
-            "confidence": 0.85,  # Placeholder confidence
-            "retrieved_count": result.get("retrieved_count", 0),
-            "retrieved_docs": result.get("retrieved_docs", []),
-            "query": result.get("query", request.query)
-        }
+
+        raw_docs = result.get("retrieved_docs", [])
+        retrieved_docs = [
+            RetrievedDoc(
+                content=d.get("content", ""),
+                metadata=d.get("metadata", {}),
+            )
+            for d in raw_docs
+        ]
+
+        return QueryResponse(
+            answer=result.get("response", "Aucune réponse générée."),
+            language=result.get("language", request.language or "fr"),
+            confidence=result.get("confidence", 0.0),
+            retrieved_count=result.get("retrieved_count", 0),
+            retrieved_docs=retrieved_docs,
+            query=result.get("query", request.query),
+        )
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Query processing failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Query failed: {str(e)}")
 
 
 @router.get("/languages")
 async def get_supported_languages():
-    """Get list of supported languages."""
-    return {
-        "languages": ["fr", "ha", "en"],
-        "default": "auto-detect"
-    }
+    return {"languages": ["fr", "ha", "en"], "default": "auto-detect"}
 
 
-# Document management endpoints for frontend integration
 @router.get("/documents")
 async def list_documents():
-    """List all ingested documents."""
+    pipeline = _get_pipeline()
     try:
-        from ..main import pipeline
-        
-        if pipeline is None:
-            raise HTTPException(status_code=503, detail="RAG Pipeline not initialized")
-        
-        # Get documents from vector store
-        # This is a placeholder - implement based on your vector store
-        return {
-            "documents": []
-        }
+        all_data = pipeline.vector_store.db.get()
+        metadatas = all_data.get("metadatas") or []
+
+        # Aggregate unique files from chunk metadata
+        seen: Dict[str, Dict] = {}
+        for meta in metadatas:
+            if not meta:
+                continue
+            fname = meta.get("filename")
+            if not fname or fname in seen:
+                continue
+            seen[fname] = {
+                "id": fname,
+                "filename": fname,
+                "size": 0,
+                "pages": 1,
+                "uploaded_at": int(time.time() * 1000),
+                "status": "ready",
+            }
+
+        # Enrich with file stats if the file still exists on disk
+        for fname, info in seen.items():
+            candidate = os.path.join(UPLOAD_DIR, fname)
+            if os.path.exists(candidate):
+                info["size"] = os.path.getsize(candidate)
+                info["pages"] = _count_pdf_pages(candidate)
+                info["uploaded_at"] = int(os.path.getmtime(candidate) * 1000)
+
+        return {"documents": list(seen.values())}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to list documents: {str(e)}")
 
 
-@router.delete("/documents/{doc_id}")
+@router.delete("/documents/{doc_id}", dependencies=[Depends(require_api_key)])
 async def delete_document(doc_id: str):
-    """Delete a specific document."""
+    pipeline = _get_pipeline()
     try:
-        from ..main import pipeline
-        
-        if pipeline is None:
-            raise HTTPException(status_code=503, detail="RAG Pipeline not initialized")
-        
-        # Delete document from vector store
-        # This is a placeholder - implement based on your vector store
-        return {"message": f"Document {doc_id} deleted successfully"}
+        all_data = pipeline.vector_store.db.get()
+        ids_to_delete = [
+            all_data["ids"][i]
+            for i, meta in enumerate(all_data.get("metadatas") or [])
+            if meta and meta.get("filename") == doc_id
+        ]
+
+        if not ids_to_delete:
+            raise HTTPException(status_code=404, detail=f"Document '{doc_id}' not found")
+
+        pipeline.vector_store.delete_documents(ids_to_delete)
+
+        # Remove physical file if present
+        candidate = os.path.join(UPLOAD_DIR, doc_id)
+        if os.path.exists(candidate):
+            os.remove(candidate)
+
+        return {"message": f"Document '{doc_id}' deleted ({len(ids_to_delete)} chunks removed)"}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to delete document: {str(e)}")
 
 
-@router.post("/upload")
+@router.post("/upload", dependencies=[Depends(require_api_key)])
 async def upload_document(file: UploadFile = File(...)):
-    """Upload and ingest a new document."""
+    pipeline = _get_pipeline()
     try:
-        from ..main import pipeline
-        import hashlib
-        import time
-        
-        if pipeline is None:
-            raise HTTPException(status_code=503, detail="RAG Pipeline not initialized")
-        
-        # Read file content
         content = await file.read()
-        file_size = len(content)
-        
-        # Generate document ID
-        doc_id = hashlib.md5(f"{file.filename}{time.time()}".encode()).hexdigest()[:10]
-        
-        # Ingest document using pipeline
-        # This is a placeholder - implement based on your ingest method
-        # You'll need to save the file and call pipeline.ingest() or similar
-        
+        if not content:
+            raise HTTPException(status_code=400, detail="Empty file")
+
+        # Save to uploads/
+        safe_name = os.path.basename(file.filename or "upload.pdf")
+        dest_path = os.path.join(UPLOAD_DIR, safe_name)
+
+        with open(dest_path, "wb") as f:
+            f.write(content)
+
+        pages = _count_pdf_pages(dest_path)
+
+        # Ingest into RAG pipeline
+        result = pipeline.ingest_document(dest_path)
+        if "error" in result:
+            os.remove(dest_path)
+            raise HTTPException(status_code=500, detail=result["error"])
+
+        doc_id = hashlib.md5(f"{safe_name}{time.time()}".encode()).hexdigest()[:10]
+
         return {
-            "id": doc_id,
-            "filename": file.filename,
-            "size": file_size,
-            "pages": 1,  # Placeholder
+            "id": safe_name,
+            "filename": safe_name,
+            "size": len(content),
+            "pages": pages,
             "uploaded_at": int(time.time() * 1000),
-            "status": "processing"
+            "status": "ready",
+            "chunks_created": result.get("documents_added", 0),
         }
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to upload document: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
+
+
+# ── Fix 10 : Feedback ──────────────────────────────────────────────────────────
+
+class FeedbackRequest(BaseModel):
+    rating: str                        # "up" | "down"
+    query: Optional[str] = ""
+    response: Optional[str] = ""
+    message_id: Optional[str] = None
+    conversation_id: Optional[str] = None
+    comment: Optional[str] = None
+
+
+@router.post("/feedback")
+async def submit_feedback(req: FeedbackRequest):
+    if req.rating not in ("up", "down"):
+        raise HTTPException(status_code=400, detail="rating must be 'up' or 'down'")
+    try:
+        from ..db.database import save_feedback
+        feedback_id = str(uuid.uuid4())
+        result = save_feedback(
+            feedback_id=feedback_id,
+            rating=req.rating,
+            query=req.query or "",
+            response=req.response or "",
+            message_id=req.message_id,
+            conversation_id=req.conversation_id,
+            comment=req.comment,
+        )
+        return {"success": True, **result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save feedback: {str(e)}")
+
+
+@router.get("/feedback/stats")
+async def feedback_stats():
+    try:
+        from ..db.database import get_feedback_stats
+        return get_feedback_stats()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ── Fix 11 : SSE Streaming ─────────────────────────────────────────────────────
+
+@router.post("/query/stream", dependencies=[Depends(require_api_key)])
+async def stream_query(request: QueryRequest):
+    """Server-Sent Events streaming endpoint."""
+    pipeline = _get_pipeline()
+
+    async def event_generator() -> AsyncGenerator[str, None]:
+        try:
+            history = [h.model_dump() for h in (request.history or [])]
+            for chunk_result in pipeline.ask_streaming(
+                query=request.query,
+                k=4,
+                language=request.language or "auto",
+                history=history,
+                patient_context=request.patient_context,
+            ):
+                if "error" in chunk_result:
+                    yield f"event: error\ndata: {json.dumps({'error': chunk_result['error']})}\n\n"
+                    return
+                chunk = chunk_result.get("chunk", "")
+                if chunk:
+                    yield f"data: {json.dumps({'type': 'chunk', 'text': chunk})}\n\n"
+                await asyncio.sleep(0)   # yield control to event loop
+
+            # Final metadata event
+            yield f"event: done\ndata: {json.dumps({'type': 'done'})}\n\n"
+
+        except Exception as e:
+            yield f"event: error\ndata: {json.dumps({'error': str(e)})}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+# ── Fix 12 : Conversation persistence ─────────────────────────────────────────
+
+class ConversationCreateRequest(BaseModel):
+    id: str
+    role: str = "patient"
+    language: str = "fr"
+
+
+@router.post("/conversations")
+async def create_conversation(req: ConversationCreateRequest):
+    try:
+        from ..db.database import create_conversation
+        return create_conversation(req.id, req.role, req.language)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/conversations")
+async def list_conversations():
+    try:
+        from ..db.database import list_conversations
+        return {"conversations": list_conversations()}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/conversations/{conv_id}/messages")
+async def get_messages(conv_id: str):
+    try:
+        from ..db.database import get_messages
+        return {"messages": get_messages(conv_id)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

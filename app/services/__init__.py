@@ -2,17 +2,17 @@
 Services Module
 
 This module provides core services for the RAG system:
-- LLM integration (Mistral)
+- LLM integration (Ollama — Gemma 4)
 - Embedding generation
 - Vector store management
 """
 
-from .llm import MistralLLM
+from .llm import OllamaLLM
 from .embeddings import EmbeddingService
 from .vectorstore import VectorStoreService
 
 __all__ = [
-    "MistralLLM",
+    "OllamaLLM",
     "EmbeddingService", 
     "VectorStoreService"
 ]

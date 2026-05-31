@@ -129,7 +129,7 @@ def start_watcher(data_dir="data"):
     print(" Initialisation du pipeline...")
     pipeline = RAGPipeline(
         persist_directory="app/db/chroma",
-        llm_model="mistral"
+        llm_model="gemma4"
     )
 
     handler = PDFHandler(pipeline)

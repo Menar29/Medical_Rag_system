@@ -42,12 +42,17 @@ export type ModelId =
   | "llava-1.6"
   | "gpt-4o-vision";
 
+export type UserRole = "patient" | "professional";
+
 type State = {
   language: Lang;
   setLanguage: (l: Lang) => void;
 
   model: ModelId;
   setModel: (m: ModelId) => void;
+
+  userRole: UserRole | null;
+  setUserRole: (r: UserRole) => void;
 
   autoPlay: boolean;
   setAutoPlay: (v: boolean) => void;
@@ -75,6 +80,9 @@ export const useAppStore = create<State>()(
 
       model: "gemma-3-multimodal",
       setModel: (m) => set({ model: m }),
+
+      userRole: null,
+      setUserRole: (r) => set({ userRole: r }),
 
       autoPlay: false,
       setAutoPlay: (v) => set({ autoPlay: v }),
@@ -144,6 +152,7 @@ export const useAppStore = create<State>()(
       partialize: (s) => ({
         language: s.language,
         model: s.model,
+        userRole: s.userRole,
         autoPlay: s.autoPlay,
         voiceEnabled: s.voiceEnabled,
         conversations: s.conversations,

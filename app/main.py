@@ -19,7 +19,11 @@ async def lifespan(app: FastAPI):
     
     # Startup
     try:
-        pipeline = RAGPipeline(llm_model="mistral")
+        from .db.database import init_db
+        init_db()
+        print(" SQLite database initialized")
+
+        pipeline = RAGPipeline(llm_model="gemma4")
         print(" RAG Pipeline initialized successfully")
         yield
     except Exception as e:
@@ -33,7 +37,7 @@ async def lifespan(app: FastAPI):
 # Create FastAPI app
 app = FastAPI(
     title="RAG API",
-    description="Retrieval-Augmented Generation API with multi-language support (French, Hausa, Zarma)",
+    description="Retrieval-Augmented Generation API with multi-language support (French, Hausa)",
     version="1.0.0",
     lifespan=lifespan
 )

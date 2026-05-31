@@ -2,85 +2,65 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useAppStore } from "@/store/useAppStore";
 import { LANGUAGES, type Lang } from "@/lib/i18n";
 import { Switch } from "@/components/ui/switch";
-import { useState } from "react";
+import { HeartPulse, Stethoscope } from "lucide-react";
 import { toast } from "sonner";
+import { useT } from "@/hooks/useT";
 
 export const Route = createFileRoute("/_app/settings")({
   component: SettingsPage,
 });
 
 function SettingsPage() {
+  const t = useT();
   const language = useAppStore((s) => s.language);
   const setLanguage = useAppStore((s) => s.setLanguage);
-  const model = useAppStore((s) => s.model);
-  const setModel = useAppStore((s) => s.setModel);
-
+  const userRole = useAppStore((s) => s.userRole);
+  const setUserRole = useAppStore((s) => s.setUserRole);
   const voiceEnabled = useAppStore((s) => s.voiceEnabled);
   const setVoiceEnabled = useAppStore((s) => s.setVoiceEnabled);
   const autoPlay = useAppStore((s) => s.autoPlay);
   const setAutoPlay = useAppStore((s) => s.setAutoPlay);
 
-  const [autoLang, setAutoLang] = useState(true);
-  const [translate, setTranslate] = useState(false);
-
   return (
     <div className="flex-1 overflow-y-auto">
       <div className="max-w-2xl mx-auto p-6 space-y-6">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Paramètres</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Personnalisez votre expérience MediRAG.
-          </p>
+          <h1 className="text-2xl font-semibold tracking-tight">{t("settings")}</h1>
+          <p className="text-sm text-muted-foreground mt-1">Personnalisez votre expérience CerviScan AI.</p>
         </div>
 
-        <Section title="Modèle IA" desc="Choisissez le modèle utilisé pour les réponses.">
+        {/* Profile / Role */}
+        <Section title="Profil" desc="Choisissez votre profil pour adapter les réponses et l'interface.">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {(
-              [
-                ["gemma-3-multimodal", "Gemma 3 Multimodal"],
-                ["qwen-vl", "Qwen-VL"],
-                ["llava-1.6", "LLaVA 1.6"],
-                ["gpt-4o-vision", "GPT-4o Vision"],
-              ] as const
-            ).map(([id, name]) => (
-              <button
-                key={id}
-                onClick={() => setModel(id)}
-                className={`text-left p-3 rounded-xl border transition ${
-                  model === id
-                    ? "border-medical/60 bg-medical/10"
-                    : "border-border/60 bg-white/[0.02] hover:bg-white/[0.04]"
-                }`}
-              >
-                <div className="text-sm font-medium">{name}</div>
-                <div className="text-xs text-muted-foreground mt-0.5">{id}</div>
-              </button>
-            ))}
+            {(["patient", "professional"] as const).map((role) => {
+              const Icon = role === "patient" ? HeartPulse : Stethoscope;
+              const gradient = role === "patient" ? "border-rose-500/60 bg-rose-500/10" : "border-medical/60 bg-medical/10";
+              const isActive = userRole === role;
+              return (
+                <button
+                  key={role}
+                  onClick={() => setUserRole(role)}
+                  className={`flex items-center gap-3 p-3 rounded-xl border text-left transition ${isActive ? gradient : "border-border/60 bg-white/[0.02] hover:bg-white/[0.04]"}`}
+                >
+                  <Icon className={`h-5 w-5 shrink-0 ${isActive ? (role === "patient" ? "text-rose-400" : "text-medical-glow") : "text-muted-foreground"}`} />
+                  <div>
+                    <div className="text-sm font-medium">{t(`role_${role}`)}</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">{t(`role_${role}_desc`)}</div>
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </Section>
 
-        <Section title="Embeddings" desc="Modèle d'encodage vectoriel utilisé pour le RAG.">
-          <select
-            defaultValue="multilingual-e5-large"
-            className="w-full bg-white/[0.03] border border-border/60 rounded-xl px-3 py-2 text-sm outline-none focus:border-medical/60"
-          >
-            <option value="multilingual-e5-large">multilingual-e5-large</option>
-            <option value="bge-m3">bge-m3</option>
-            <option value="text-embedding-3-large">text-embedding-3-large</option>
-          </select>
-        </Section>
-
-        <Section title="Langue de l'interface" desc="L'interface s'adapte à votre langue.">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        {/* Language */}
+        <Section title={t("settings") + " · Langue"} desc="La langue de l'interface et de la détection vocale.">
+          <div className="grid grid-cols-3 gap-2">
             {LANGUAGES.map((l) => (
               <button
                 key={l.code}
                 onClick={() => setLanguage(l.code as Lang)}
-                className={`flex items-center gap-2 p-2.5 rounded-xl border text-sm transition ${
-                  language === l.code
-                    ? "border-medical/60 bg-medical/10"
-                    : "border-border/60 bg-white/[0.02] hover:bg-white/[0.04]"
-                }`}
+                className={`flex items-center gap-2 p-2.5 rounded-xl border text-sm transition ${language === l.code ? "border-medical/60 bg-medical/10" : "border-border/60 bg-white/[0.02] hover:bg-white/[0.04]"}`}
               >
                 <span className="text-base">{l.flag}</span>
                 <span>{l.label}</span>
@@ -89,14 +69,22 @@ function SettingsPage() {
           </div>
         </Section>
 
+        {/* Audio */}
         <Section title="Audio" desc="Synthèse vocale et reconnaissance.">
           <Toggle label="Activer la synthèse vocale" checked={voiceEnabled} onChange={setVoiceEnabled} />
           <Toggle label="Lecture automatique des réponses" checked={autoPlay} onChange={setAutoPlay} />
         </Section>
 
-        <Section title="Traduction" desc="Détection et traduction automatiques.">
-          <Toggle label="Détection automatique de la langue" checked={autoLang} onChange={setAutoLang} />
-          <Toggle label="Traduire les sources en langue cible" checked={translate} onChange={setTranslate} />
+        {/* Model info */}
+        <Section title="Modèle IA" desc="Modèle de langage utilisé pour la génération des réponses.">
+          <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl border border-border/60 bg-white/[0.02] text-sm">
+            <span className="h-2 w-2 rounded-full bg-emerald-400" />
+            <span className="font-medium">Gemma 4</span>
+            <span className="text-muted-foreground">via Ollama · local</span>
+          </div>
+          <p className="text-xs text-muted-foreground mt-1.5">
+            Assurez-vous qu'Ollama tourne avec <code className="text-[11px] px-1 py-0.5 rounded bg-white/[0.06]">ollama run gemma4</code>
+          </p>
         </Section>
 
         <div className="flex justify-end">
@@ -112,15 +100,7 @@ function SettingsPage() {
   );
 }
 
-function Section({
-  title,
-  desc,
-  children,
-}: {
-  title: string;
-  desc?: string;
-  children: React.ReactNode;
-}) {
+function Section({ title, desc, children }: { title: string; desc?: string; children: React.ReactNode }) {
   return (
     <div className="glass rounded-2xl p-5 space-y-3 shadow-soft">
       <div>
@@ -132,15 +112,7 @@ function Section({
   );
 }
 
-function Toggle({
-  label,
-  checked,
-  onChange,
-}: {
-  label: string;
-  checked: boolean;
-  onChange: (b: boolean) => void;
-}) {
+function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (b: boolean) => void }) {
   return (
     <label className="flex items-center justify-between py-1.5 cursor-pointer">
       <span className="text-sm text-foreground/90">{label}</span>

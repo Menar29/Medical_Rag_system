@@ -7,7 +7,7 @@ class LanguageDetector:
     """Service for detecting language of text input."""
     
     def __init__(self):
-        # Language indicators for French, Hausa, and Zarma
+        # Language indicators for French and Hausa
         self.language_patterns = {
             'fr': {
                 'common_words': [
@@ -35,18 +35,6 @@ class LanguageDetector:
                 ],
                 'special_chars': ['ɓ', 'ɗ', 'ƙ', 'ʼ', 'sh', 'ch', 'ts'],
                 'patterns': [r'\b(na|ne|in|da|ga)\b', r'\b(wannan|wace|wadannan)\b']
-            },
-            'zm': {
-                'common_words': [
-                    'i', 'a', 'ga', 'na', 'no', 'ma', 'ka', 'ra', 'ya', 'ze', 'we', 'me',
-                    'te', 'se', 'ne', 'nde', 'nka', 'nga', 'ngo', 'ŋ', 'ɲ', 'ɛ', 'ɔ',
-                    'hãa', 'hoy', 'bari', 'goy', 'te', 'no', 'wo', 'fu', 'koy', 'beri',
-                    'bani', 'ban', 'kã', 'ã', 'õ', 'ĩ', 'ũ', 'ẽ', 'cẽ', 'fõ', 'hõ',
-                    'jõ', 'kõ', 'lõ', 'mõ', 'nõ', 'põ', 'rõ', 'sõ', 'tõ', 'wõ', 'yõ',
-                    'zõ', 'ari', 'ize', 'izey', 'gubey', 'hanti', 'bã', 'mba', 'nda'
-                ],
-                'special_chars': ['ŋ', 'ɲ', 'ɛ', 'ɔ', 'ã', 'õ', 'ĩ', 'ũ', 'ẽ', 'cẽ', 'fõ'],
-                'patterns': [r'\b(i|a|ga|na|no)\b', r'\b(hãa|hoy|bari|goy)\b']
             }
         }
     
@@ -207,7 +195,7 @@ class LanguageDetector:
         # Different languages have different word length distributions
         # This is a simplified heuristic
         if avg_length < 4 and short_words / len(words) > 0.4:
-            return 0.3  # Likely Hausa or Zarma (shorter words)
+            return 0.3  # Likely Hausa (shorter words)
         elif avg_length > 5 and long_words / len(words) > 0.2:
             return 0.3  # Likely French (longer words)
         else:
@@ -218,7 +206,6 @@ class LanguageDetector:
         return {
             'fr': 'Français',
             'ha': 'Hausa',
-            'zm': 'Zarma',
             'unknown': 'Inconnu'
         }
     
