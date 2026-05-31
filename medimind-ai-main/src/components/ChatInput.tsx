@@ -169,11 +169,11 @@ export function ChatInput({ onSubmit, disabled }: Props) {
               {listening ? (
                 <button
                   onClick={toggleVoice}
-                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-medical/15 text-medical border border-medical/30 text-xs"
+                  className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg ${theme.bg} ${theme.text} ${theme.border} border text-xs`}
                 >
                   <span className="relative flex h-2 w-2">
-                    <span className="absolute inline-flex h-full w-full rounded-full bg-medical opacity-60 animate-ping" />
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-medical" />
+                    <span className={`absolute inline-flex h-full w-full rounded-full ${theme.pulse} opacity-60 animate-ping`} />
+                    <span className={`relative inline-flex rounded-full h-2 w-2 ${theme.pulse}`} />
                   </span>
                   {t("listening")}
                   <Square className="h-3 w-3 fill-current" />

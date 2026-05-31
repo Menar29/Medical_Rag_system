@@ -1,30 +1,37 @@
 import { motion } from "framer-motion";
-import { HeartPulse, Stethoscope, Mic } from "lucide-react";
+import { HeartPulse, Mic, Shield, Stethoscope } from "lucide-react";
 import { useAppStore, type UserRole } from "@/store/useAppStore";
 import { useT } from "@/hooks/useT";
 import { LanguageSelector } from "./LanguageSelector";
+
+const ROLES: { id: UserRole; icon: React.ElementType; gradient: string; hover: string }[] = [
+  {
+    id: "patient",
+    icon: HeartPulse,
+    gradient: "from-rose-500 to-pink-600",
+    hover: "hover:border-rose-500/50 hover:bg-rose-500/5",
+  },
+  {
+    id: "professional",
+    icon: Stethoscope,
+    gradient: "from-medical to-violet-soft",
+    hover: "hover:border-medical/50 hover:bg-medical/5",
+  },
+  {
+    id: "admin",
+    icon: Shield,
+    gradient: "from-amber-500 to-orange-500",
+    hover: "hover:border-amber-500/50 hover:bg-amber-500/5",
+  },
+];
 
 export function RoleSelector() {
   const t = useT();
   const setUserRole = useAppStore((s) => s.setUserRole);
 
-  const roles: { id: UserRole; icon: React.ElementType; color: string; bg: string }[] = [
-    {
-      id: "patient",
-      icon: HeartPulse,
-      color: "from-rose-500 to-pink-600",
-      bg: "hover:border-rose-500/50 hover:bg-rose-500/5",
-    },
-    {
-      id: "professional",
-      icon: Stethoscope,
-      color: "from-medical to-violet-soft",
-      bg: "hover:border-medical/50 hover:bg-medical/5",
-    },
-  ];
-
   return (
-    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background px-4"
+    <div
+      className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background px-4"
       style={{
         backgroundImage:
           "radial-gradient(900px circle at 20% -10%, oklch(0.7 0.16 245 / 12%), transparent 50%), radial-gradient(700px circle at 80% 100%, oklch(0.68 0.18 295 / 10%), transparent 50%)",
@@ -58,24 +65,24 @@ export function RoleSelector() {
         <p className="mt-1.5 text-sm text-muted-foreground max-w-sm">{t("role_select_sub")}</p>
       </motion.div>
 
-      {/* Role cards */}
+      {/* Role cards — 2 col on sm, then 3rd full-width or 3-col on lg */}
       <motion.div
         initial="hidden"
         animate="show"
-        variants={{ hidden: {}, show: { transition: { staggerChildren: 0.1, delayChildren: 0.3 } } }}
-        className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-xl"
+        variants={{ hidden: {}, show: { transition: { staggerChildren: 0.09, delayChildren: 0.3 } } }}
+        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 w-full max-w-2xl"
       >
-        {roles.map((role) => (
+        {ROLES.map((role) => (
           <motion.button
             key={role.id}
             variants={{ hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0 } }}
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             onClick={() => setUserRole(role.id)}
-            className={`group flex flex-col items-start gap-4 p-6 rounded-2xl border border-border/60 bg-white/[0.02] transition-all shadow-soft text-left ${role.bg}`}
+            className={`group flex flex-col items-start gap-4 p-5 rounded-2xl border border-border/60 bg-white/[0.02] transition-all shadow-soft text-left ${role.hover}`}
           >
-            <div className={`h-12 w-12 rounded-xl bg-gradient-to-br ${role.color} grid place-items-center shadow-elegant`}>
-              <role.icon className="h-6 w-6 text-white" strokeWidth={2.2} />
+            <div className={`h-11 w-11 rounded-xl bg-gradient-to-br ${role.gradient} grid place-items-center shadow-elegant`}>
+              <role.icon className="h-5.5 w-5.5 text-white" strokeWidth={2.2} />
             </div>
             <div>
               <div className="text-base font-semibold">{t(`role_${role.id}`)}</div>
@@ -87,7 +94,7 @@ export function RoleSelector() {
         ))}
       </motion.div>
 
-      {/* Voice hint */}
+      {/* Footer */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -98,7 +105,6 @@ export function RoleSelector() {
         <span>Support vocal FR · Hausa</span>
       </motion.div>
 
-      {/* Language selector */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}

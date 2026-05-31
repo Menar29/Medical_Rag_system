@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Eye, EyeOff, HeartPulse, Loader2, Stethoscope } from "lucide-react";
+import { Eye, EyeOff, HeartPulse, Loader2, Shield, Stethoscope } from "lucide-react";
 import { useAppStore } from "@/store/useAppStore";
 import { useT } from "@/hooks/useT";
 import { useRoleTheme } from "@/hooks/useRoleTheme";
@@ -28,9 +28,11 @@ export function AuthModal() {
   const [region, setRegion] = useState("");
   const [specialite, setSpecialite] = useState("");
   const [etablissement, setEtablissement] = useState("");
+  const [adminSecret, setAdminSecret] = useState("");
 
   const isPatient = userRole === "patient";
-  const Icon = isPatient ? HeartPulse : Stethoscope;
+  const isAdmin = userRole === "admin";
+  const Icon = isAdmin ? Shield : isPatient ? HeartPulse : Stethoscope;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,8 +51,9 @@ export function AuthModal() {
           prenom: prenom || undefined,
           age: isPatient && age ? Number(age) : undefined,
           region: isPatient && region ? region : undefined,
-          specialite: !isPatient && specialite ? specialite : undefined,
-          etablissement: !isPatient && etablissement ? etablissement : undefined,
+          specialite: !isPatient && !isAdmin && specialite ? specialite : undefined,
+          etablissement: !isPatient && !isAdmin && etablissement ? etablissement : undefined,
+          admin_secret: isAdmin && adminSecret ? adminSecret : undefined,
         });
       }
       setServiceToken(result.access_token);
@@ -82,7 +85,7 @@ export function AuthModal() {
           </div>
           <h1 className="text-2xl font-semibold tracking-tight gradient-text">CerviScan AI</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {isPatient ? t("role_patient") : t("role_professional")}
+            {isPatient ? t("role_patient") : isAdmin ? t("role_admin") : t("role_professional")}
           </p>
         </div>
 
@@ -149,6 +152,20 @@ export function AuthModal() {
                     <div className="grid grid-cols-2 gap-2">
                       <Field label="Âge" type="number" value={age} onChange={setAge} placeholder="32" min="1" max="120" />
                       <Field label="Région" value={region} onChange={setRegion} placeholder="Niamey" />
+                    </div>
+                  ) : isAdmin ? (
+                    <div className="space-y-1">
+                      <label className="text-xs text-amber-400 font-medium flex items-center gap-1">
+                        🔒 {t("admin_secret_label")}
+                      </label>
+                      <input
+                        type="password"
+                        value={adminSecret}
+                        onChange={(e) => setAdminSecret(e.target.value)}
+                        placeholder={t("admin_secret_placeholder")}
+                        required
+                        className="w-full bg-amber-500/5 border border-amber-500/30 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-amber-500/60 transition"
+                      />
                     </div>
                   ) : (
                     <>

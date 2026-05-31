@@ -42,12 +42,12 @@ export type ModelId =
   | "llava-1.6"
   | "gpt-4o-vision";
 
-export type UserRole = "patient" | "professional";
+export type UserRole = "patient" | "professional" | "admin";
 
 export type UserProfile = {
   id: string;
   email: string;
-  role: UserRole;
+  role: "patient" | "professional" | "admin";
   language: string;
   nom?: string;
   prenom?: string;
@@ -57,6 +57,8 @@ export type UserProfile = {
   // Professional
   specialite?: string;
   etablissement?: string;
+  // Meta
+  created_at?: string;
 };
 
 type State = {

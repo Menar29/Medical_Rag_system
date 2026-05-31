@@ -192,7 +192,7 @@ export async function submitFeedback(params: {
 export type RegisterPayload = {
   email: string;
   password: string;
-  role: "patient" | "professional";
+  role: "patient" | "professional" | "admin";
   language?: string;
   nom?: string;
   prenom?: string;
@@ -200,6 +200,7 @@ export type RegisterPayload = {
   region?: string;
   specialite?: string;
   etablissement?: string;
+  admin_secret?: string;
 };
 
 export type AuthResponse = {
@@ -246,4 +247,35 @@ export async function updateMe(updates: Partial<UserProfile>): Promise<UserProfi
   const data = await res.json();
   if (!res.ok) throw new Error(data.detail ?? `HTTP ${res.status}`);
   return data as UserProfile;
+}
+
+// ── Admin ─────────────────────────────────────────────────────────────────────
+
+export async function adminListUsers(): Promise<UserProfile[]> {
+  const res = await fetch(`${API_BASE}/auth/admin/users`, { headers: authHeaders() });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.detail ?? `HTTP ${res.status}`);
+  return data as UserProfile[];
+}
+
+export async function adminChangeRole(userId: string, role: string): Promise<UserProfile> {
+  const res = await fetch(`${API_BASE}/auth/admin/users/${userId}/role`, {
+    method: "PUT",
+    headers: authHeaders(),
+    body: JSON.stringify({ role }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.detail ?? `HTTP ${res.status}`);
+  return data as UserProfile;
+}
+
+export async function adminDeleteUser(userId: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/auth/admin/users/${userId}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.detail ?? `HTTP ${res.status}`);
+  }
 }
