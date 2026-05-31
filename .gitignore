@@ -1,9 +1,35 @@
-```
-# Environment
+# ── Python ────────────────────────────────────────────────────────────────────
+venv/
+__pycache__/
+*.py[cod]
+*.pyo
+.Python
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+
+# ── Environnement ─────────────────────────────────────────────────────────────
 .env
 .env.local
 *.env.*
 
-# Examples
-.env.example
-```
+# ── Base de données ───────────────────────────────────────────────────────────
+*.sqlite
+*.sqlite3
+*.sqlite-shm
+*.sqlite-wal
+app/db/chroma/
+app/db/*.sqlite*
+
+# ── Uploads & données traitées ────────────────────────────────────────────────
+uploads/
+processed/
+
+# ── macOS ─────────────────────────────────────────────────────────────────────
+.DS_Store
+__MACOSX/
+
+# ── IDE ───────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/

@@ -12,6 +12,8 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from .auth import require_api_key
 from .jwt_auth import get_current_user_optional
+from ..db.pg_database import SessionLocal
+from ..db.models import QueryLog
 
 router = APIRouter()
 
@@ -81,8 +83,9 @@ async def health_check():
 
 
 @router.post("/query", response_model=QueryResponse, dependencies=[Depends(require_api_key)])
-async def query_rag(request: QueryRequest):
+async def query_rag(request: QueryRequest, current_user=Depends(get_current_user_optional)):
     pipeline = _get_pipeline()
+    t0 = time.time()
     try:
         result = pipeline.ask(
             query=request.query,
@@ -104,9 +107,24 @@ async def query_rag(request: QueryRequest):
             for d in raw_docs
         ]
 
+        latency = (time.time() - t0) * 1000
+        lang = result.get("language", request.language or "fr")
+
+        # Log query asynchronously — best effort
+        try:
+            with SessionLocal() as db:
+                db.add(QueryLog(
+                    user_id=getattr(current_user, "id", None),
+                    language=lang,
+                    latency_ms=round(latency, 1),
+                ))
+                db.commit()
+        except Exception:
+            pass
+
         return QueryResponse(
             answer=result.get("response", "Aucune réponse générée."),
-            language=result.get("language", request.language or "fr"),
+            language=lang,
             confidence=result.get("confidence", 0.0),
             retrieved_count=result.get("retrieved_count", 0),
             retrieved_docs=retrieved_docs,

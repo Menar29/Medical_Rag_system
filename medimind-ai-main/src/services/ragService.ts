@@ -279,3 +279,26 @@ export async function adminDeleteUser(userId: string): Promise<void> {
     throw new Error(data.detail ?? `HTTP ${res.status}`);
   }
 }
+
+export type AnalyticsData = {
+  users: {
+    total: number;
+    by_role: { patient: number; professional: number; admin: number };
+    by_language: { fr: number; en: number; ha: number };
+    registrations_by_day: { day: string; date: string; count: number }[];
+  };
+  queries: {
+    total: number;
+    avg_latency_ms: number;
+    by_language: { fr: number; en: number; ha: number };
+    by_day: { day: string; date: string; count: number }[];
+    latency_by_day: { day: string; date: string; ms: number }[];
+  };
+};
+
+export async function adminGetAnalytics(): Promise<AnalyticsData> {
+  const res = await fetch(`${API_BASE}/auth/admin/analytics`, { headers: authHeaders() });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.detail ?? `HTTP ${res.status}`);
+  return data as AnalyticsData;
+}

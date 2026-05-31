@@ -5,6 +5,8 @@ import uvicorn
 from contextlib import asynccontextmanager
 
 import os
+from dotenv import load_dotenv
+load_dotenv()
 from .api.routes import router
 from .api.users import router as users_router
 from .rag.pipeline import RAGPipeline

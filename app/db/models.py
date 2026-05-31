@@ -1,6 +1,6 @@
 from datetime import datetime
 from uuid import uuid4
-from sqlalchemy import Column, DateTime, Integer, String
+from sqlalchemy import Column, DateTime, Float, Integer, String
 from sqlalchemy.orm import DeclarativeBase
 
 
@@ -32,3 +32,13 @@ class User(Base):
     # ── Méta ──────────────────────────────────────────────────────────────────
     created_at   = Column(DateTime, default=datetime.utcnow, nullable=False)
     last_login   = Column(DateTime)
+
+
+class QueryLog(Base):
+    __tablename__ = "query_logs"
+
+    id          = Column(String, primary_key=True, default=lambda: str(uuid4()))
+    user_id     = Column(String, nullable=True)
+    language    = Column(String, nullable=False, default="fr")
+    latency_ms  = Column(Float, nullable=False, default=0.0)
+    created_at  = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
