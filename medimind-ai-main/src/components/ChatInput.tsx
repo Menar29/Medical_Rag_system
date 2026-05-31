@@ -13,6 +13,7 @@ import {
 import { useT } from "@/hooks/useT";
 import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
 import { useAppStore } from "@/store/useAppStore";
+import { useRoleTheme } from "@/hooks/useRoleTheme";
 import { toast } from "sonner";
 import type { Attachment } from "@/store/useAppStore";
 
@@ -25,6 +26,7 @@ const uid = () => Math.random().toString(36).slice(2, 10);
 
 export function ChatInput({ onSubmit, disabled }: Props) {
   const t = useT();
+  const theme = useRoleTheme();
   const language = useAppStore((s) => s.language);
   const userRole = useAppStore((s) => s.userRole);
   const [text, setText] = useState("");
@@ -99,7 +101,7 @@ export function ChatInput({ onSubmit, disabled }: Props) {
             if (e.dataTransfer.files.length) addFiles(e.dataTransfer.files);
           }}
           className={`glass-strong rounded-2xl shadow-elegant transition-all ${
-            isDrag ? "ring-2 ring-medical/60 scale-[1.005]" : ""
+            isDrag ? `ring-2 ${theme.ring} scale-[1.005]` : ""
           }`}
         >
           {/* Attachments preview */}
@@ -197,7 +199,7 @@ export function ChatInput({ onSubmit, disabled }: Props) {
               whileTap={{ scale: 0.92 }}
               onClick={handleSubmit}
               disabled={disabled || (!text.trim() && attachments.length === 0)}
-              className="h-9 w-9 rounded-xl grid place-items-center bg-gradient-to-br from-medical to-violet-soft text-primary-foreground shadow-elegant disabled:opacity-40 disabled:cursor-not-allowed enabled:hover:brightness-110 transition"
+              className={`h-9 w-9 rounded-xl grid place-items-center bg-gradient-to-br ${theme.gradient} text-primary-foreground shadow-elegant disabled:opacity-40 disabled:cursor-not-allowed enabled:hover:brightness-110 transition`}
               aria-label={t("send")}
             >
               <ArrowUp className="h-4 w-4" strokeWidth={2.6} />

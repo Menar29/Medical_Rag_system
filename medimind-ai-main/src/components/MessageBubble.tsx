@@ -9,11 +9,13 @@ import {
 import type { Message } from "@/store/useAppStore";
 import { useAppStore } from "@/store/useAppStore";
 import { useSpeechSynthesis } from "@/hooks/useSpeechSynthesis";
+import { useRoleTheme } from "@/hooks/useRoleTheme";
 import { useT } from "@/hooks/useT";
+import { submitFeedback } from "@/services/ragService";
 import { TypingLoader } from "./TypingLoader";
 import { toast } from "sonner";
 
-export function MessageBubble({ message }: { message: Message }) {
+export function MessageBubble({ message, conversationId }: { message: Message; conversationId?: string }) {
   const isUser = message.role === "user";
   return (
     <motion.div
@@ -50,13 +52,14 @@ export function MessageBubble({ message }: { message: Message }) {
           !isUser && <TypingLoader />
         )}
 
-        {!isUser && !message.streaming && <Footer message={message} />}
+        {!isUser && !message.streaming && <Footer message={message} conversationId={conversationId} />}
       </div>
     </motion.div>
   );
 }
 
 function Avatar({ role }: { role: "user" | "assistant" }) {
+  const theme = useRoleTheme();
   if (role === "user") {
     return (
       <div className="h-8 w-8 shrink-0 rounded-lg bg-white/[0.06] border border-border/60 grid place-items-center">
@@ -65,7 +68,7 @@ function Avatar({ role }: { role: "user" | "assistant" }) {
     );
   }
   return (
-    <div className="h-8 w-8 shrink-0 rounded-lg bg-gradient-to-br from-medical to-violet-soft grid place-items-center shadow-elegant">
+    <div className={`h-8 w-8 shrink-0 rounded-lg bg-gradient-to-br ${theme.gradient} grid place-items-center shadow-elegant`}>
       <Sparkles className="h-4 w-4 text-primary-foreground" />
     </div>
   );
@@ -91,8 +94,9 @@ function Attachment({ att }: { att: { type: string; name: string; url: string } 
   );
 }
 
-function Footer({ message }: { message: Message }) {
+function Footer({ message, conversationId }: { message: Message; conversationId?: string }) {
   const t = useT();
+  const theme = useRoleTheme();
   const [copied, setCopied] = useState(false);
   const [feedback, setFeedback] = useState<"up" | "down" | null>(null);
   const confidence = Math.round((message.confidence ?? 0) * 100);
@@ -120,10 +124,18 @@ function Footer({ message }: { message: Message }) {
     speaking ? stop() : speak(message.content, message.detectedLang ?? language);
   };
 
-  const giveFeedback = (value: "up" | "down") => {
+  const giveFeedback = async (value: "up" | "down") => {
     if (feedback) return;
     setFeedback(value);
     toast.success(t("feedback_thanks"));
+    // Fire-and-forget to backend
+    submitFeedback({
+      rating: value,
+      query: "",           // caller can enrich if needed
+      response: message.content,
+      messageId: message.id,
+      conversationId,
+    }).catch(() => null);  // silent — feedback is best-effort
   };
 
   return (
@@ -134,7 +146,7 @@ function Footer({ message }: { message: Message }) {
           <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground mr-2">
             <span>Confiance</span>
             <div className="h-1.5 w-20 rounded-full bg-white/[0.06] overflow-hidden">
-              <div className="h-full bg-gradient-to-r from-medical to-violet-soft" style={{ width: `${confidence}%` }} />
+              <div className={`h-full bg-gradient-to-r ${theme.gradient}`} style={{ width: `${confidence}%` }} />
             </div>
             <span className="text-foreground/80 font-medium">{confidence}%</span>
           </div>

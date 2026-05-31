@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from .auth import require_api_key
+from .jwt_auth import get_current_user_optional
 
 router = APIRouter()
 
@@ -318,18 +319,27 @@ class ConversationCreateRequest(BaseModel):
 
 
 @router.post("/conversations")
-async def create_conversation(req: ConversationCreateRequest):
+async def create_conversation(
+    req: ConversationCreateRequest,
+    current_user=Depends(get_current_user_optional),
+):
     try:
         from ..db.database import create_conversation
-        return create_conversation(req.id, req.role, req.language)
+        user_id = current_user.id if current_user else None
+        return create_conversation(req.id, req.role, req.language, user_id=user_id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/conversations")
-async def list_conversations():
+async def list_conversations(
+    current_user=Depends(get_current_user_optional),
+):
+    """Returns conversations for the authenticated user, or all if anonymous."""
     try:
-        from ..db.database import list_conversations
+        from ..db.database import list_conversations, list_conversations_by_user
+        if current_user:
+            return {"conversations": list_conversations_by_user(current_user.id)}
         return {"conversations": list_conversations()}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

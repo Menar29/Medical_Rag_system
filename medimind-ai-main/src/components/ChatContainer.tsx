@@ -100,6 +100,7 @@ export function ChatContainer() {
   const language = useAppStore((s) => s.language);
   const model = useAppStore((s) => s.model);
   const userRole = useAppStore((s) => s.userRole);
+  const user = useAppStore((s) => s.user);
   const conversations = useAppStore((s) => s.conversations);
   const activeId = useAppStore((s) => s.activeId);
   const newConversation = useAppStore((s) => s.newConversation);
@@ -122,14 +123,46 @@ export function ChatContainer() {
     addMessage(conv, userMsg);
     const asstId = uid();
     addMessage(conv, { id: asstId, role: "assistant", content: "", createdAt: Date.now(), streaming: true });
+    // Build history from previous messages (exclude the new ones just added)
+    const history = messages
+      .filter((m) => !m.streaming)
+      .map((m) => ({ role: m.role, content: m.content }));
+
+    // Patient context from user profile
+    const patientContext =
+      userRole === "patient" && user
+        ? {
+            ...(user.age    ? { age: user.age }       : {}),
+            ...(user.region ? { region: user.region } : {}),
+          }
+        : undefined;
+
     try {
       let acc = "";
-      for await (const evt of streamQuery({ prompt: text, language, model, files: [] })) {
-        if (evt.type === "chunk") { acc += evt.text; updateMessage(conv, asstId, { content: acc }); }
-        else { updateMessage(conv, asstId, { streaming: false, sources: evt.meta.sources, confidence: evt.meta.confidence, detectedLang: evt.meta.detectedLang }); }
+      for await (const evt of streamQuery({
+        prompt: text,
+        language,
+        history,
+        patient_context: patientContext,
+      })) {
+        if (evt.type === "chunk") {
+          acc += evt.text;
+          updateMessage(conv, asstId, { content: acc });
+        } else {
+          updateMessage(conv, asstId, {
+            streaming: false,
+            sources: evt.meta.sources,
+            confidence: evt.meta.confidence,
+            detectedLang: evt.meta.detectedLang,
+          });
+        }
       }
-    } catch {
-      updateMessage(conv, asstId, { streaming: false, content: "Une erreur est survenue. Réessayez." });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Erreur inattendue";
+      updateMessage(conv, asstId, {
+        streaming: false,
+        content: `❌ **Erreur** : ${msg}\n\nVérifiez que le backend est démarré sur le port 8001.`,
+      });
     }
   };
 
@@ -143,7 +176,7 @@ export function ChatContainer() {
             : <PatientWelcome onPick={(q) => send(q, [])} />
         ) : (
           <div className="max-w-3xl mx-auto py-4">
-            {messages.map((m) => <MessageBubble key={m.id} message={m} />)}
+            {messages.map((m) => <MessageBubble key={m.id} message={m} conversationId={activeId ?? undefined} />)}
           </div>
         )}
       </div>

@@ -1,11 +1,13 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  BarChart3, FileText, HeartPulse, MessageSquarePlus,
+  BarChart3, FileText, HeartPulse, LogOut, MessageSquarePlus,
   Settings as SettingsIcon, Sparkles, Stethoscope, Trash2, UserCog,
 } from "lucide-react";
 import { useAppStore } from "@/store/useAppStore";
 import { useT } from "@/hooks/useT";
+import { useRoleTheme } from "@/hooks/useRoleTheme";
+import { setServiceToken } from "@/services/ragService";
 import { cn } from "@/lib/utils";
 import { LanguageSelector } from "@/components/LanguageSelector";
 
@@ -18,10 +20,13 @@ const navItems = (t: (k: string) => string) => [
 
 export function Sidebar() {
   const t = useT();
+  const theme = useRoleTheme();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const conversations = useAppStore((s) => s.conversations);
   const activeId = useAppStore((s) => s.activeId);
   const userRole = useAppStore((s) => s.userRole);
+  const user = useAppStore((s) => s.user);
+  const logout = useAppStore((s) => s.logout);
   const setUserRole = useAppStore((s) => s.setUserRole);
   const newConversation = useAppStore((s) => s.newConversation);
   const setActive = useAppStore((s) => s.setActive);
@@ -30,17 +35,17 @@ export function Sidebar() {
   const isPatient = userRole === "patient";
   const RoleIcon = isPatient ? HeartPulse : Stethoscope;
   const roleLabel = t(isPatient ? "role_badge_patient" : "role_badge_professional");
-  const roleColor = isPatient ? "from-rose-500 to-pink-600" : "from-medical to-violet-soft";
+  const displayName = user ? `${user.prenom ?? ""} ${user.nom ?? ""}`.trim() || user.email : roleLabel;
 
   return (
     <aside className="hidden md:flex w-72 shrink-0 flex-col border-r border-border/60 bg-sidebar/70 backdrop-blur-xl">
       {/* Brand */}
       <div className="flex items-center gap-3 px-4 h-16 border-b border-border/50">
         <div className="relative">
-          <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-medical to-violet-soft grid place-items-center shadow-elegant">
+          <div className={`h-9 w-9 rounded-xl bg-gradient-to-br ${theme.gradient} grid place-items-center shadow-elegant`}>
             <Stethoscope className="h-[1.1rem] w-[1.1rem] text-white" strokeWidth={2.4} />
           </div>
-          <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-emerald-400 ring-2 ring-sidebar animate-pulse" />
+          <span className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full ${theme.pulse} ring-2 ring-sidebar animate-pulse`} />
         </div>
         <div className="leading-tight">
           <div className="text-sm font-semibold tracking-tight">{t("app_name")}</div>
@@ -55,10 +60,10 @@ export function Sidebar() {
           title={t("role_change")}
           className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg border border-border/50 bg-white/[0.02] hover:bg-white/[0.04] transition group"
         >
-          <div className={`h-6 w-6 rounded-md bg-gradient-to-br ${roleColor} grid place-items-center`}>
+          <div className={`h-6 w-6 rounded-md bg-gradient-to-br ${theme.gradient} grid place-items-center`}>
             <RoleIcon className="h-3.5 w-3.5 text-white" strokeWidth={2.4} />
           </div>
-          <span className="text-xs text-foreground/85 font-medium flex-1 text-left">{roleLabel}</span>
+          <span className="text-xs text-foreground/85 font-medium flex-1 text-left truncate">{displayName}</span>
           <UserCog className="h-3.5 w-3.5 text-muted-foreground/60 group-hover:text-muted-foreground transition" />
         </button>
       </div>
@@ -94,7 +99,7 @@ export function Sidebar() {
               {active && (
                 <motion.span
                   layoutId="sidebar-active"
-                  className="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-r bg-gradient-to-b from-medical to-violet-soft"
+                  className={`absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-r bg-gradient-to-b ${theme.gradient}`}
                 />
               )}
               <item.icon className="h-4 w-4" />
@@ -141,7 +146,7 @@ export function Sidebar() {
       </div>
 
       {/* Footer */}
-      <div className="border-t border-border/50 p-3 space-y-3">
+      <div className="border-t border-border/50 p-3 space-y-2">
         <div className="flex items-center justify-between text-xs">
           <span className="text-muted-foreground">{t("api_status")}</span>
           <span className="flex items-center gap-1.5 text-emerald-400">
@@ -150,6 +155,13 @@ export function Sidebar() {
           </span>
         </div>
         <LanguageSelector />
+        <button
+          onClick={() => { setServiceToken(null); logout(); }}
+          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition"
+        >
+          <LogOut className="h-3.5 w-3.5" />
+          Déconnexion
+        </button>
       </div>
     </aside>
   );

@@ -4,7 +4,9 @@ from fastapi.responses import JSONResponse
 import uvicorn
 from contextlib import asynccontextmanager
 
+import os
 from .api.routes import router
+from .api.users import router as users_router
 from .rag.pipeline import RAGPipeline
 
 
@@ -21,7 +23,11 @@ async def lifespan(app: FastAPI):
     try:
         from .db.database import init_db
         init_db()
-        print(" SQLite database initialized")
+        print(" SQLite tables initialized")
+
+        from .db.pg_database import init_pg_db
+        init_pg_db()
+        print(" User database initialized")
 
         pipeline = RAGPipeline(llm_model="gemma4")
         print(" RAG Pipeline initialized successfully")
@@ -35,24 +41,26 @@ async def lifespan(app: FastAPI):
 
 
 # Create FastAPI app
+_cors_origins = [o.strip() for o in os.getenv("CORS_ORIGINS", "*").split(",")]
+
 app = FastAPI(
-    title="RAG API",
-    description="Retrieval-Augmented Generation API with multi-language support (French, Hausa)",
+    title="CerviScan AI — API",
+    description="Retrieval-Augmented Generation API — cancer du col de l'utérus · FR / Hausa",
     version="1.0.0",
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
-# Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure appropriately for production
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Include API routes
-app.include_router(router, prefix="/api/v1", tags=["RAG"])
+# ── Routers ───────────────────────────────────────────────────────────────────
+app.include_router(router,       prefix="/api/v1",   tags=["RAG"])
+app.include_router(users_router, prefix="/api/v1",   tags=["Authentification"])
 
 
 @app.get("/")

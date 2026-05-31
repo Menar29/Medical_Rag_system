@@ -1,6 +1,26 @@
 version: "3.9"
 
 services:
+
+  # ── PostgreSQL ────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: cerviscan_postgres
+    environment:
+      POSTGRES_DB:       ${POSTGRES_DB:-cerviscan}
+      POSTGRES_USER:     ${POSTGRES_USER:-cerviscan}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cerviscan_secret}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-cerviscan}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   # ── Ollama (Gemma 4 LLM) ──────────────────────────────────────
   ollama:
     image: ollama/ollama:latest
@@ -10,7 +30,6 @@ services:
     ports:
       - "11434:11434"
     restart: unless-stopped
-    # Pull the model on first start
     entrypoint: >
       sh -c "ollama serve &
              sleep 5 &&
@@ -24,9 +43,13 @@ services:
     env_file:
       - .env
     environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-cerviscan}:${POSTGRES_PASSWORD:-cerviscan_secret}@postgres:5432/${POSTGRES_DB:-cerviscan}
       - OLLAMA_BASE_URL=http://ollama:11434
       - DB_PATH=/app/app/db/cerviscan.sqlite
       - API_KEY=${API_KEY:-changeme}
+      - JWT_SECRET=${JWT_SECRET:-cerviscan-jwt-secret-CHANGE-IN-PROD}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:8080}
+      - REQUIRE_API_KEY=${REQUIRE_API_KEY:-false}
     volumes:
       - ./uploads:/app/uploads
       - ./data:/app/data
@@ -34,7 +57,10 @@ services:
     ports:
       - "8000:8000"
     depends_on:
-      - ollama
+      postgres:
+        condition: service_healthy
+      ollama:
+        condition: service_started
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
@@ -58,4 +84,5 @@ services:
       - backend
 
 volumes:
+  postgres_data:
   ollama_data:

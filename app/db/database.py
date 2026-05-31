@@ -19,6 +19,7 @@ def init_db() -> None:
         conn.executescript("""
             CREATE TABLE IF NOT EXISTS conversations (
                 id          TEXT PRIMARY KEY,
+                user_id     TEXT,                   -- NULL = session anonyme
                 role        TEXT NOT NULL DEFAULT 'patient',
                 language    TEXT NOT NULL DEFAULT 'fr',
                 created_at  INTEGER NOT NULL,
@@ -67,14 +68,19 @@ def _connect():
 
 # ── Conversations ──────────────────────────────────────────────────────────────
 
-def create_conversation(conv_id: str, role: str = "patient", language: str = "fr") -> Dict:
+def create_conversation(
+    conv_id: str,
+    role: str = "patient",
+    language: str = "fr",
+    user_id: Optional[str] = None,
+) -> Dict:
     now = int(time.time() * 1000)
     with _connect() as conn:
         conn.execute(
-            "INSERT OR IGNORE INTO conversations (id, role, language, created_at, updated_at) VALUES (?,?,?,?,?)",
-            (conv_id, role, language, now, now),
+            "INSERT OR IGNORE INTO conversations (id, user_id, role, language, created_at, updated_at) VALUES (?,?,?,?,?,?)",
+            (conv_id, user_id, role, language, now, now),
         )
-    return {"id": conv_id, "role": role, "language": language, "created_at": now}
+    return {"id": conv_id, "user_id": user_id, "role": role, "language": language, "created_at": now}
 
 
 def get_conversation(conv_id: str) -> Optional[Dict]:
@@ -87,6 +93,15 @@ def list_conversations(limit: int = 50) -> List[Dict]:
     with _connect() as conn:
         rows = conn.execute(
             "SELECT * FROM conversations ORDER BY updated_at DESC LIMIT ?", (limit,)
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def list_conversations_by_user(user_id: str, limit: int = 50) -> List[Dict]:
+    with _connect() as conn:
+        rows = conn.execute(
+            "SELECT * FROM conversations WHERE user_id=? ORDER BY updated_at DESC LIMIT ?",
+            (user_id, limit),
         ).fetchall()
     return [dict(r) for r in rows]
 

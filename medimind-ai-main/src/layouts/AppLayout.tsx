@@ -1,26 +1,42 @@
+import { useEffect } from "react";
 import { Outlet, useRouterState } from "@tanstack/react-router";
 import { Sidebar } from "@/components/Sidebar";
 import { RoleSelector } from "@/components/RoleSelector";
+import { AuthModal } from "@/components/AuthModal";
 import { LanguageSelector } from "@/components/LanguageSelector";
 import { useAppStore } from "@/store/useAppStore";
 import { useT } from "@/hooks/useT";
+import { useRoleTheme } from "@/hooks/useRoleTheme";
+import { setServiceToken } from "@/services/ragService";
 
 const TITLES: Record<string, string> = {
-  "/": "chat",
-  "/documents": "documents",
-  "/analytics": "analytics",
-  "/settings": "settings",
+  "/":           "chat",
+  "/documents":  "documents",
+  "/analytics":  "analytics",
+  "/settings":   "settings",
 };
 
 export function AppLayout() {
   const t = useT();
+  const theme = useRoleTheme();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const userRole = useAppStore((s) => s.userRole);
+  const token    = useAppStore((s) => s.token);
   const titleKey = TITLES[pathname];
-  const title = titleKey ? t(titleKey) : t("app_name");
+  const title    = titleKey ? t(titleKey) : t("app_name");
 
+  // Sync token into the ragService on every mount / token change
+  useEffect(() => {
+    setServiceToken(token);
+  }, [token]);
+
+  // 1 — No role selected → onboarding
   if (!userRole) return <RoleSelector />;
 
+  // 2 — Role selected but not logged in → auth
+  if (!token) return <AuthModal />;
+
+  // 3 — Authenticated → main app
   return (
     <div className="flex h-screen w-full overflow-hidden">
       <Sidebar />
@@ -28,9 +44,9 @@ export function AppLayout() {
         <header className="h-14 shrink-0 flex items-center gap-3 px-4 sm:px-6 border-b border-border/50 glass">
           <div className="text-sm font-medium text-foreground/90 capitalize">{title}</div>
           <div className="flex-1" />
-          {/* Gemma 4 label */}
+          {/* Model badge */}
           <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-border/50 bg-white/[0.02] text-[11px] text-muted-foreground">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+            <span className={`h-1.5 w-1.5 rounded-full ${theme.pulse}`} />
             Gemma 4 · Ollama
           </div>
           <div className="w-44">

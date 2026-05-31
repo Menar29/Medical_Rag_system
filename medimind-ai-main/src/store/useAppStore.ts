@@ -44,6 +44,21 @@ export type ModelId =
 
 export type UserRole = "patient" | "professional";
 
+export type UserProfile = {
+  id: string;
+  email: string;
+  role: UserRole;
+  language: string;
+  nom?: string;
+  prenom?: string;
+  // Patient
+  age?: number;
+  region?: string;
+  // Professional
+  specialite?: string;
+  etablissement?: string;
+};
+
 type State = {
   language: Lang;
   setLanguage: (l: Lang) => void;
@@ -53,6 +68,11 @@ type State = {
 
   userRole: UserRole | null;
   setUserRole: (r: UserRole) => void;
+
+  token: string | null;
+  user: UserProfile | null;
+  setAuth: (token: string, user: UserProfile) => void;
+  logout: () => void;
 
   autoPlay: boolean;
   setAutoPlay: (v: boolean) => void;
@@ -83,6 +103,11 @@ export const useAppStore = create<State>()(
 
       userRole: null,
       setUserRole: (r) => set({ userRole: r }),
+
+      token: null,
+      user: null,
+      setAuth: (token, user) => set({ token, user, userRole: user.role }),
+      logout: () => set({ token: null, user: null, userRole: null, conversations: [], activeId: null }),
 
       autoPlay: false,
       setAutoPlay: (v) => set({ autoPlay: v }),
@@ -153,6 +178,8 @@ export const useAppStore = create<State>()(
         language: s.language,
         model: s.model,
         userRole: s.userRole,
+        token: s.token,
+        user: s.user,
         autoPlay: s.autoPlay,
         voiceEnabled: s.voiceEnabled,
         conversations: s.conversations,
