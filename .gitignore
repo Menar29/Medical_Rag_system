@@ -26,6 +26,8 @@ app/db/*.sqlite*
 # ── Uploads & données traitées ────────────────────────────────────────────────
 uploads/
 processed/
+Medical_OCR-NLP_System/
+cervi-ai/
 
 # ── macOS ─────────────────────────────────────────────────────────────────────
 .DS_Store

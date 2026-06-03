@@ -31,7 +31,7 @@ async def lifespan(app: FastAPI):
         init_pg_db()
         print(" User database initialized")
 
-        pipeline = RAGPipeline(llm_model="gemma4")
+        pipeline = RAGPipeline(llm_model=os.getenv("OLLAMA_MODEL", "gemma4"))
         print(" RAG Pipeline initialized successfully")
         yield
     except Exception as e:

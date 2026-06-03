@@ -22,7 +22,7 @@ langchain-huggingface==0.3.1
 # ── Embeddings / ML ───────────────────────────────────────────────────────────
 sentence-transformers==5.1.2
 # torch CPU only pour Linux — remplacer par torch==2.8.0+cu121 si GPU CUDA disponible
-torch==2.8.0
+torch==2.8.0 --index-url https://download.pytorch.org/whl/cpu
 transformers==4.57.6
 tokenizers==0.22.2
 huggingface_hub==0.36.2

@@ -1,3 +1,4 @@
+import os
 from typing import List, Dict, Any, Optional
 from langchain_core.documents import Document
 from .retriever import RAGRetriever
@@ -17,6 +18,9 @@ class RAGPipeline:
                  persist_directory: str = "app/db/chroma",
                  embedding_model: str = "sentence-transformers/paraphrase-multilingual-mpnet-base-v2",
                  llm_model: str = "gemma4"):
+        persist_directory = os.getenv("CHROMA_PATH", persist_directory)
+        embedding_model = os.getenv("EMBEDDING_MODEL", embedding_model)
+        llm_model = os.getenv("OLLAMA_MODEL", llm_model)
         
         # Initialize core services
         self.embedding_service = EmbeddingService(model_name=embedding_model)

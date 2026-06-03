@@ -8,8 +8,8 @@ class OllamaLLM:
     """Service for connecting to local Ollama Gemma 4 model."""
     
     def __init__(self, model: str = "gemma4", base_url: str = "http://localhost:11434"):
-        self.model = model
-        self.base_url = base_url
+        self.model = os.getenv("OLLAMA_MODEL", model)
+        self.base_url = os.getenv("OLLAMA_BASE_URL", base_url).rstrip("/")
     
     def generate_response(
         self, 

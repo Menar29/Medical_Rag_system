@@ -19,7 +19,7 @@ class PDFIngestionService:
     ):
         self.vector_store = vector_store or VectorStoreService()
 
-        # 🔥 CHUNKING OPTIMISÉ
+        #  CHUNKING OPTIMISÉ
         self.text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=chunk_size,
             chunk_overlap=chunk_overlap,
@@ -43,16 +43,16 @@ class PDFIngestionService:
             if not os.path.exists(pdf_path):
                 return {"error": f"PDF file not found: {pdf_path}"}
 
-            # 🔥 Extraction
+            #  Extraction
             text_content = self._extract_text_from_pdf(pdf_path)
 
-            # 🔥 Nettoyage
+            #  Nettoyage
             text_content = self._clean_text(text_content)
 
             if not text_content.strip():
                 return {"error": "No text content found in PDF"}
 
-            # 🔥 Chunking
+            #  Chunking
             chunks = (
                 self.text_splitter.split_text(text_content)
                 if process_text else [text_content]
@@ -62,7 +62,7 @@ class PDFIngestionService:
 
             for i, chunk in enumerate(chunks):
 
-                # 🔥 filtrage bruit
+                #  filtrage bruit
                 if len(chunk.strip()) < 50:
                     continue
 
@@ -85,11 +85,11 @@ class PDFIngestionService:
                     metadata=doc_metadata
                 ))
 
-            # 🔥 sécurité
+            #  sécurité
             if not documents:
                 return {"error": "No valid chunks after processing"}
 
-            # 🔥 stockage
+            #  stockage
             doc_ids = self.vector_store.add_documents(documents)
 
             return {
@@ -160,7 +160,7 @@ class PDFIngestionService:
         return text_content
 
     def _clean_text(self, text: str) -> str:
-        """🔥 Nettoyage critique pour embeddings"""
+        """ Nettoyage critique pour embeddings"""
 
         text = text.replace("\n", " ")
         text = " ".join(text.split())

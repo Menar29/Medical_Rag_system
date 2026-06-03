@@ -1,88 +1,116 @@
-version: "3.9"
-
 services:
-
-  # ── PostgreSQL ────────────────────────────────────────────────
   postgres:
     image: postgres:16-alpine
     container_name: cerviscan_postgres
     environment:
-      POSTGRES_DB:       ${POSTGRES_DB:-cerviscan}
-      POSTGRES_USER:     ${POSTGRES_USER:-cerviscan}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cerviscan_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-cerviscan}
+      POSTGRES_USER: ${POSTGRES_USER:-cerviscan}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_this_password}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-cerviscan}"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
 
-  # ── Ollama (Gemma 4 LLM) ──────────────────────────────────────
   ollama:
     image: ollama/ollama:latest
     container_name: cerviscan_ollama
+    environment:
+      OLLAMA_KEEP_ALIVE: ${OLLAMA_KEEP_ALIVE:-24h}
+      OLLAMA_NUM_PARALLEL: ${OLLAMA_NUM_PARALLEL:-2}
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
     volumes:
       - ollama_data:/root/.ollama
     ports:
-      - "11434:11434"
+      - "${OLLAMA_PORT:-11434}:11434"
     restart: unless-stopped
-    entrypoint: >
-      sh -c "ollama serve &
-             sleep 5 &&
-             ollama pull gemma4 &&
-             wait"
+    gpus: all
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
 
-  # ── CerviScan AI Backend (FastAPI) ────────────────────────────
-  backend:
-    build: .
-    container_name: cerviscan_backend
-    env_file:
-      - .env
+  ollama-init:
+    image: ollama/ollama:latest
+    container_name: cerviscan_ollama_init
     environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-cerviscan}:${POSTGRES_PASSWORD:-cerviscan_secret}@postgres:5432/${POSTGRES_DB:-cerviscan}
-      - OLLAMA_BASE_URL=http://ollama:11434
-      - DB_PATH=/app/app/db/cerviscan.sqlite
-      - API_KEY=${API_KEY:-changeme}
-      - JWT_SECRET=${JWT_SECRET:-cerviscan-jwt-secret-CHANGE-IN-PROD}
-      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:8080}
-      - REQUIRE_API_KEY=${REQUIRE_API_KEY:-false}
+      OLLAMA_HOST: http://ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-gemma4}
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["ollama pull $${OLLAMA_MODEL}"]
+    depends_on:
+      ollama:
+        condition: service_healthy
+    restart: "no"
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cerviscan_backend
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-cerviscan}:${POSTGRES_PASSWORD:-change_this_password}@postgres:5432/${POSTGRES_DB:-cerviscan}
+      DB_PATH: /app/app/db/cerviscan.sqlite
+      CHROMA_PATH: /app/app/db/chroma
+      UPLOAD_DIR: /app/uploads
+      OLLAMA_BASE_URL: http://ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-gemma4}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-sentence-transformers/paraphrase-multilingual-mpnet-base-v2}
+      API_KEY: ${API_KEY:-change_this_api_key}
+      JWT_SECRET: ${JWT_SECRET:-change_this_jwt_secret}
+      REQUIRE_API_KEY: ${REQUIRE_API_KEY:-true}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8080}
     volumes:
-      - ./uploads:/app/uploads
-      - ./data:/app/data
-      - ./app/db:/app/app/db
+      - backend_uploads:/app/uploads
+      - backend_data:/app/data
+      - backend_db:/app/app/db
+      - hf_cache:/home/cerviscan/.cache/huggingface
     ports:
-      - "8000:8000"
+      - "${BACKEND_PORT:-8000}:8000"
     depends_on:
       postgres:
         condition: service_healthy
       ollama:
-        condition: service_started
+        condition: service_healthy
+      ollama-init:
+        condition: service_completed_successfully
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
       interval: 30s
       timeout: 10s
-      retries: 3
+      retries: 5
+      start_period: 90s
 
-  # ── Frontend (Vite / Node) ────────────────────────────────────
   frontend:
     image: node:20-alpine
     container_name: cerviscan_frontend
     working_dir: /app
+    environment:
+      VITE_API_BASE: ${VITE_API_BASE:-http://localhost:8000/api/v1}
     volumes:
       - ./medimind-ai-main:/app
+      - frontend_node_modules:/app/node_modules
     ports:
-      - "8080:8080"
-    environment:
-      - VITE_API_BASE=http://localhost:8000/api/v1
-    command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 8080"
+      - "${FRONTEND_PORT:-8080}:8080"
+    command: sh -c "npm ci && npm run dev -- --host 0.0.0.0 --port 8080"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
 
 volumes:
   postgres_data:
   ollama_data:
+  backend_uploads:
+  backend_data:
+  backend_db:
+  hf_cache:
+  frontend_node_modules:

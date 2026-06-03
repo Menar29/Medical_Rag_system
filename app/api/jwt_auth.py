@@ -40,7 +40,7 @@ def verify_password(plain: str, hashed: str) -> bool:
 # ── Token helpers ─────────────────────────────────────────────────────────────
 
 def create_access_token(user_id: str, role: str) -> str:
-    expire = datetime.utcnow() + timedelta(days=TOKEN_EXPIRE_DAYS)
+    expire = datetime.now() + timedelta(days=TOKEN_EXPIRE_DAYS)
     payload = {"sub": user_id, "role": role, "exp": expire}
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
