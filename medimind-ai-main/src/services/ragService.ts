@@ -7,12 +7,16 @@ export const API_BASE =
 
 // ── Auth header ───────────────────────────────────────────────────────────────
 
+const API_KEY = import.meta.env.VITE_API_KEY as string | undefined;
+
 function authHeaders(extra?: Record<string, string>): Record<string, string> {
   // Access store state directly (safe outside React tree)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const token = (globalThis as any).__cerviscan_token__ ?? null;
   return {
     "Content-Type": "application/json",
+    // Clé API (client autorise) — requise par les endpoints proteges du backend
+    ...(API_KEY ? { "X-API-Key": API_KEY } : {}),
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...extra,
   };
@@ -147,7 +151,11 @@ export async function uploadDocument(file: File): Promise<IngestedDoc> {
   const token = (globalThis as any).__cerviscan_token__ ?? null;
   const res = await fetch(`${API_BASE}/upload`, {
     method: "POST",
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    // multipart : pas de Content-Type manuel, mais on garde la cle API + le JWT
+    headers: {
+      ...(API_KEY ? { "X-API-Key": API_KEY } : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     body: fd,
   });
   if (!res.ok) {
