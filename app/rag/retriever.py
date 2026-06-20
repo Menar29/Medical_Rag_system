@@ -22,23 +22,25 @@ class RAGRetriever:
     def reranked_search(
         self,
         query: str,
-        k: int = 4,
-        fetch_k: int = 12,
+        k: int = 6,
+        fetch_k: int = 20,
         score_threshold: float = 2.2,
     ) -> List[Tuple[Document, float]]:
         """
-        Fetch fetch_k candidates, filter by score_threshold, return top-k.
+        Fetch fetch_k candidates, rerank, return the top-k.
 
         Strategy:
           1. Retrieve fetch_k candidates from Chroma (L2 distances).
-          2. Discard chunks above score_threshold (too far from query).
-          3. Score remaining chunks: reward keyword overlap + penalise short chunks.
-          4. Return top-k after reranking, sorted best-first.
+          2. Score EVERY candidate: distance, minus bonuses for keyword overlap
+             and decent length (lower = better).
+          3. Return the top-k after reranking.
 
-        Note : le modele d'embeddings multilingue (mpnet) produit des distances L2
-        non normalisees, typiquement ~1.6-2.4 pour des passages pertinents — d'ou un
-        seuil a 2.2 (et non 1.5, qui filtrait absolument tout). Le fallback ci-dessous
-        garantit qu'on ne renvoie jamais un contexte vide alors que des candidats existent.
+        Important : on ne filtre PLUS durement par score_threshold. Le modele
+        d'embeddings multilingue (mpnet) place souvent des passages pertinents a
+        2.2-2.6 ; un filtre dur affamait le contexte (ex. les chunks "CIN 2/CIN 3"
+        etaient jetes -> "information non trouvee"). On laisse desormais le LLM, via
+        son prompt strict, juger de la pertinence sur un contexte top-k complet.
+        score_threshold ne sert plus qu'a marquer les candidats "loin" (info debug).
         """
         candidates = self.db.similarity_search_with_score(query, k=fetch_k)
 
@@ -46,9 +48,6 @@ class RAGRetriever:
 
         reranked = []
         for doc, dist in candidates:
-            if dist > score_threshold:
-                continue
-
             # Keyword overlap bonus (normalised)
             doc_tokens = set(doc.page_content.lower().split())
             overlap = len(query_tokens & doc_tokens) / max(len(query_tokens), 1)
@@ -61,13 +60,6 @@ class RAGRetriever:
             reranked.append((doc, rerank_score))
 
         reranked.sort(key=lambda x: x[1])
-
-        # Fallback : si le seuil a tout filtre mais que Chroma a des candidats,
-        # garder les top-k par distance brute (le LLM dira "non trouve" si hors-sujet).
-        if not reranked and candidates:
-            candidates.sort(key=lambda x: x[1])
-            return candidates[:k]
-
         return reranked[:k]
 
     def similarity_search_with_threshold(

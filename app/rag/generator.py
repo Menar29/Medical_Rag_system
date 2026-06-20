@@ -158,12 +158,13 @@ DOCUMENTS MÉDICAUX PERTINENTS :
 QUESTION ACTUELLE : {query}
 
 RÈGLES OBLIGATOIRES :
-1. Utilise UNIQUEMENT les informations des documents ci-dessus
-2. Si l'information est absente, réponds : "Je ne trouve pas cette information dans les documents fournis."
-3. Ne jamais inventer, ni compléter avec des connaissances externes
-4. Cite la source utilisée (ex: SOURCE 1)
-5. Réponds en langue : {language}
-6. Sois clair, précis, bienveillant envers les patientes et rigoureux avec les professionnels
+1. Fonde ta réponse sur les documents ci-dessus : tu peux synthétiser, reformuler et combiner les passages pertinents (même partiels) pour répondre utilement.
+2. Ne réponds "Je ne trouve pas cette information dans les documents fournis." QUE si AUCUN passage n'a de rapport avec la question. Si des passages sont liés même partiellement, exploite-les.
+3. N'invente jamais de faits, de chiffres ou de recommandations absents des documents.
+4. Cite la ou les sources utilisées (ex: SOURCE 1, SOURCE 3).
+5. Si le CONTEXTE PATIENTE est fourni, tiens-en compte pour personnaliser ta réponse.
+6. Réponds en langue : {language}
+7. Sois clair, précis, bienveillant envers les patientes et rigoureux avec les professionnels.
 
 RÉPONSE :"""
 

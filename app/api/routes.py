@@ -90,7 +90,7 @@ async def query_rag(request: QueryRequest, current_user=Depends(get_current_user
     try:
         result = pipeline.ask(
             query=request.query,
-            k=4,
+            k=6,
             language=request.language or "auto",
             history=[h.model_dump() for h in (request.history or [])],
             patient_context=request.patient_context,
@@ -289,7 +289,7 @@ async def analyze_report_endpoint(
             pipeline = _get_pipeline()
             result = pipeline.ask(
                 query=query,
-                k=4,
+                k=6,
                 language=language or "auto",
                 history=[],
                 patient_context=patient_context,
@@ -359,7 +359,7 @@ async def stream_query(request: QueryRequest):
             history = [h.model_dump() for h in (request.history or [])]
             for chunk_result in pipeline.ask_streaming(
                 query=request.query,
-                k=4,
+                k=6,
                 language=request.language or "auto",
                 history=history,
                 patient_context=request.patient_context,
