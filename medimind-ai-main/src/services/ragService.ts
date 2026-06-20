@@ -141,6 +141,34 @@ export async function deleteDocument(id: string): Promise<void> {
   }
 }
 
+// ── Analyse d'un bilan biologique (pont OCR-NLP -> patient_context) ─────────────
+
+export type AnalyzeReportResult = {
+  patient_context: Record<string, string | number>;
+  lab_results: unknown[];
+  summary?: string | null;
+  alerts?: string[];
+};
+
+/** Envoie une image/PDF de bilan au backend, qui appelle l'OCR-NLP et renvoie
+ *  un patient_context exploitable par la requete RAG. */
+export async function analyzeReport(file: Blob, filename: string): Promise<AnalyzeReportResult> {
+  const fd = new FormData();
+  fd.append("file", file, filename);
+  const res = await fetch(`${API_BASE}/analyze-report`, {
+    method: "POST",
+    headers: {
+      ...(API_KEY ? { "X-API-Key": API_KEY } : {}),
+    },
+    body: fd,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: `HTTP ${res.status}` }));
+    throw new Error(err.detail ?? `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
 export async function uploadDocument(file: File): Promise<IngestedDoc> {
   const fd = new FormData();
   fd.append("file", file);

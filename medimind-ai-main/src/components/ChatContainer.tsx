@@ -5,7 +5,8 @@ import { useAppStore, type Attachment, type Message } from "@/store/useAppStore"
 import { useT } from "@/hooks/useT";
 import { MessageBubble } from "./MessageBubble";
 import { ChatInput } from "./ChatInput";
-import { streamQuery } from "@/services/ragService";
+import { streamQuery, analyzeReport } from "@/services/ragService";
+import { toast } from "sonner";
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 
@@ -129,13 +130,33 @@ export function ChatContainer() {
       .map((m) => ({ role: m.role, content: m.content }));
 
     // Patient context from user profile
-    const patientContext =
+    let patientContext: Record<string, string | number> | undefined =
       userRole === "patient" && user
         ? {
             ...(user.age    ? { age: user.age }       : {}),
             ...(user.region ? { region: user.region } : {}),
           }
         : undefined;
+
+    // Si une image de bilan est jointe : OCR-NLP -> patient_context fusionne
+    const report = attachments.find((a) => a.type === "image");
+    if (report) {
+      try {
+        updateMessage(conv, asstId, { content: "_Analyse du bilan biologique en cours…_" });
+        const blob = await fetch(report.url).then((r) => r.blob());
+        const analysis = await analyzeReport(blob, report.name);
+        if (analysis.patient_context && Object.keys(analysis.patient_context).length) {
+          patientContext = { ...(patientContext ?? {}), ...analysis.patient_context };
+          const nb = Array.isArray(analysis.lab_results) ? analysis.lab_results.length : 0;
+          toast.success(`Bilan analysé : ${nb} résultat(s) extrait(s)`);
+        }
+      } catch (e) {
+        const m = e instanceof Error ? e.message : "erreur";
+        toast.error(`Analyse du bilan impossible : ${m}`);
+      } finally {
+        updateMessage(conv, asstId, { content: "" });
+      }
+    }
 
     try {
       let acc = "";
