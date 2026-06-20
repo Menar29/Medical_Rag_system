@@ -1,4 +1,5 @@
-from typing import List
+import os
+from typing import List, Optional
 from langchain_huggingface import HuggingFaceEmbeddings
 
 
@@ -6,7 +7,12 @@ class EmbeddingService:
     """Service for generating embeddings (single consistent system)."""
 
     def __init__(self, model_name: str = "sentence-transformers/paraphrase-multilingual-mpnet-base-v2",
-                 device: str = "cpu"):
+                 device: Optional[str] = None):
+
+        # device : "cpu" (defaut) ou "cuda" si torch CUDA est installe.
+        # La LLM (Ollama) tourne deja sur GPU ; les embeddings restent sur CPU
+        # par defaut car le modele est leger. Surcharger via EMBEDDING_DEVICE.
+        device = device or os.getenv("EMBEDDING_DEVICE", "cpu")
 
         self.model_name = model_name
 

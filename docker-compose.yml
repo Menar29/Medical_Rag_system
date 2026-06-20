@@ -63,6 +63,7 @@ services:
       OLLAMA_BASE_URL: http://ollama:11434
       OLLAMA_MODEL: ${OLLAMA_MODEL:-gemma4}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-sentence-transformers/paraphrase-multilingual-mpnet-base-v2}
+      EMBEDDING_DEVICE: ${EMBEDDING_DEVICE:-cpu}
       API_KEY: ${API_KEY:-change_this_api_key}
       JWT_SECRET: ${JWT_SECRET:-change_this_jwt_secret}
       REQUIRE_API_KEY: ${REQUIRE_API_KEY:-true}
@@ -90,7 +91,7 @@ services:
       start_period: 90s
 
   frontend:
-    image: node:20-alpine
+    image: node:22-alpine # <-- Changé de 20-alpine à 22-alpine
     container_name: cerviscan_frontend
     working_dir: /app
     environment:

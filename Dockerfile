@@ -6,9 +6,13 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# System deps for sentence-transformers / torch (CPU)
+# Deps systeme pour sentence-transformers / torch et la compilation de mmh3 / chromadb.
+# build-essential fournit deja g++, mais on le declare explicitement par securite.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential curl git \
+    build-essential \
+    g++ \
+    curl \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies first (layer cache)
