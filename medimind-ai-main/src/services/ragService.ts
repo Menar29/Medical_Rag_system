@@ -80,13 +80,11 @@ export async function* streamQuery(
 
   const data = await res.json();
 
-  // Simulate token-by-token streaming for smooth UX
+  // La reponse est deja complete cote backend : on l'affiche d'un coup.
+  // (Avant : faux streaming avec un delai artificiel de 8-15ms/token qui
+  //  rallongeait inutilement l'attente percue de plusieurs secondes.)
   const fullText: string = data.answer ?? "";
-  const tokens = fullText.split(/(\s+)/);
-  for (const tk of tokens) {
-    await new Promise((r) => setTimeout(r, 8 + Math.random() * 15));
-    yield { type: "chunk", text: tk };
-  }
+  if (fullText) yield { type: "chunk", text: fullText };
 
   const rawDocs: Array<{ content?: string; metadata?: Record<string, unknown> }> =
     data.retrieved_docs ?? [];

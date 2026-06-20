@@ -39,6 +39,9 @@ Réponse:"""
                     "model": self.model,
                     "prompt": full_prompt,
                     "stream": False,
+                    # Gemma 4 est un modele a raisonnement : sans ceci les tokens
+                    # partent dans la "reflexion" -> reponse vide + latence inutile.
+                    "think": False,
                     "options": {
                         "temperature": temperature,
                         "num_predict": max_tokens
@@ -81,6 +84,7 @@ Réponse:"""
                     "model": self.model,
                     "prompt": full_prompt,
                     "stream": True,
+                    "think": False,  # Gemma 4 : desactive la reflexion (voir generate_response)
                     "options": {
                         "temperature": temperature,
                         "num_predict": max_tokens
