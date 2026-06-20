@@ -12,6 +12,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from .auth import require_api_key
 from .jwt_auth import get_current_user_optional
+from ..services.ocr_client import analyze_report, ocr_data_to_patient_context
 from ..db.pg_database import SessionLocal
 from ..db.models import QueryLog
 
@@ -244,6 +245,65 @@ async def upload_document(file: UploadFile = File(...)):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
+
+
+# ── Pont OCR-NLP -> RAG ────────────────────────────────────────────────────────
+
+@router.post("/analyze-report", dependencies=[Depends(require_api_key)])
+async def analyze_report_endpoint(
+    file: UploadFile = File(...),
+    query: Optional[str] = None,
+    language: Optional[str] = None,
+):
+    """
+    Analyse un bilan biologique (image/PDF) via le systeme OCR-NLP, et renvoie un
+    `patient_context` pret a etre passe a /query.
+
+    Si `query` est fourni, lance directement la question sur le RAG en injectant ce
+    contexte patiente, et renvoie la reponse (pratique pour un appel unique).
+    """
+    try:
+        content = await file.read()
+        if not content:
+            raise HTTPException(status_code=400, detail="Fichier vide")
+
+        # 1) OCR-NLP : extraction structuree
+        try:
+            structured = analyze_report(content, file.filename or "report.png")
+        except Exception as e:
+            raise HTTPException(status_code=502, detail=f"Service OCR indisponible ou en echec : {e}")
+
+        # 2) JSON labo -> contexte patiente lisible
+        patient_context = ocr_data_to_patient_context(structured)
+
+        response: Dict[str, Any] = {
+            "filename": file.filename,
+            "patient_context": patient_context,
+            "lab_results": structured.get("lab_results", []),
+            "summary": structured.get("summary_fr") or structured.get("summary"),
+            "alerts": structured.get("alerts", []),
+        }
+
+        # 3) Optionnel : repondre tout de suite via le RAG avec ce contexte
+        if query:
+            pipeline = _get_pipeline()
+            result = pipeline.ask(
+                query=query,
+                k=4,
+                language=language or "auto",
+                history=[],
+                patient_context=patient_context,
+            )
+            response["answer"] = result.get("response")
+            response["confidence"] = result.get("confidence", 0.0)
+            response["retrieved_count"] = result.get("retrieved_count", 0)
+
+        return response
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Analyse echouee : {str(e)}")
 
 
 # ── Fix 10 : Feedback ──────────────────────────────────────────────────────────

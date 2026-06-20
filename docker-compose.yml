@@ -68,6 +68,7 @@ services:
       JWT_SECRET: ${JWT_SECRET:-change_this_jwt_secret}
       REQUIRE_API_KEY: ${REQUIRE_API_KEY:-true}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8080}
+      OCR_API_URL: ${OCR_API_URL:-http://ocr:8001/process}
     volumes:
       - backend_uploads:/app/uploads
       - backend_data:/app/data
@@ -89,6 +90,32 @@ services:
       timeout: 10s
       retries: 5
       start_period: 90s
+
+  # Systeme OCR-NLP (sibling project) — extrait les bilans biologiques en JSON.
+  # Le backend RAG l'appelle via OCR_API_URL (http://ocr:8001/process).
+  ocr:
+    build:
+      context: ../Medical_OCR-NLP_System
+      dockerfile: Dockerfile
+    image: medical-ocr-nlp-gpu:latest
+    container_name: cerviscan_ocr
+    environment:
+      USE_GPU: ${OCR_USE_GPU:-true}
+      ENABLE_POSTGRES_EXPORT: "false"
+      PYTHONUNBUFFERED: "1"
+      HF_TRUST_TORCH_LOAD: "1"
+      HF_HOME: /app/.cache/huggingface
+      EASYOCR_MODULE_PATH: /app/.cache/easyocr
+    volumes:
+      - ../Medical_OCR-NLP_System/data:/app/data
+      - ../Medical_OCR-NLP_System/models:/app/models
+      - ../Medical_OCR-NLP_System/src:/app/src
+      - ocr_hf_cache:/app/.cache/huggingface
+      - ocr_easyocr_cache:/app/.cache/easyocr
+    # Pas de port hote expose : le backend joint l'OCR via le reseau interne
+    # (http://ocr:8001). Evite tout conflit avec un conteneur OCR autonome.
+    restart: unless-stopped
+    gpus: all
 
   frontend:
     image: node:22-alpine # <-- Changé de 20-alpine à 22-alpine
@@ -116,3 +143,10 @@ volumes:
   backend_db:
   hf_cache:
   frontend_node_modules:
+  # Reutilise les caches modeles deja telecharges par le projet OCR (pas de re-download)
+  ocr_hf_cache:
+    external: true
+    name: medical_ocr-nlp_system_hf_cache
+  ocr_easyocr_cache:
+    external: true
+    name: medical_ocr-nlp_system_easyocr_cache
